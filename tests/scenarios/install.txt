@@ -10,15 +10,28 @@ alice: !keys \r
 alice: !keys \r
 alice: !keys w\r
 @wait 3
-@screen alice
 alice: cat /proc/partitions
 @expect alice vda1
-alice: mkfs.ext2 /dev/vda1
+alice: mkfs.ext2 -q /dev/vda1
 alice: mount /dev/vda1 /mnt && df -h /mnt
 @expect alice /mnt
-alice: brickstrap /mnt
+alice: brickstrap /mnt cowsay
 @expect alice Done.
-alice: echo mybox > /mnt/etc/hostname; sync; umount /mnt
+alice: echo mybox > /mnt/etc/hostname; sync; umount /mnt; echo UNMOUNTED
+@expect alice UNMOUNTED
 @reboot alice
 @wait 15
-@screen alice
+@expect alice mybox login:
+alice: !keys root\r
+@wait 5
+alice: hostname; cat /etc/os-release | head -1; brick list
+@expect alice cowsay 1.0
+alice: brick install fortune
+alice: fortune | cowsay; echo persistent-file > /root/note.txt; sync
+@expect alice (oo)
+@reboot alice
+@wait 15
+alice: !keys root\r
+@wait 5
+alice: cat /root/note.txt
+@expect alice persistent-file

@@ -27,6 +27,13 @@ if [ "$(git -C "$WORK" rev-parse HEAD 2>/dev/null || true)" != "$BUILDROOT_REV" 
 	git -C "$WORK" checkout -q FETCH_HEAD
 fi
 
+# On no-MMU, FLAT binaries get a fixed stack: elf2flt's default is only 4 KB,
+# which busybox hush overflows when it re-executes itself for $(a | b),
+# corrupting its own heap. Busybox asks for at least 20 KB; give it 64 KB.
+if ! grep -q BUSYBOX_FLAT_STACKSIZE "$WORK/package/busybox/busybox.mk"; then
+	echo 'BUSYBOX_FLAT_STACKSIZE = 65536' >> "$WORK/package/busybox/busybox.mk"
+fi
+
 # Our configs, overlay and helper sources live at <buildroot>/brick.
 rm -rf "$WORK/brick"
 mkdir -p "$WORK/brick"
