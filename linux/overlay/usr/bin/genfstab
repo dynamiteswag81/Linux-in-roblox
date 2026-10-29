@@ -1,0 +1,12 @@
+#!/bin/sh
+# genfstab - print fstab lines for the filesystems mounted under a root.
+root="${1%/}"
+[ "$root" = "-U" ] && root="${2%/}"
+[ -n "$root" ] || { echo "usage: genfstab <root>" >&2; exit 1; }
+echo "# <device>  <dir>  <type>  <options>  <dump>  <pass>"
+while read -r dev dir type opts rest; do
+	case "$dir" in
+		"$root") echo "$dev  /  $type  rw  0  1" ;;
+		"$root"/*) echo "$dev  ${dir#$root}  $type  rw  0  2" ;;
+	esac
+done < /proc/mounts

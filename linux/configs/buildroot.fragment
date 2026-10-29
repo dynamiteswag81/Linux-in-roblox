@@ -1,0 +1,22 @@
+# Brick Linux buildroot settings appended to base/buildroot.config (cnlohr's mini-rv32ima config).
+# Paths are relative to the buildroot top directory; build.sh copies this tree to <buildroot>/brick.
+
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="brick/configs/base/kernel.config"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="brick/configs/kernel.fragment"
+BR2_PACKAGE_BUSYBOX_CONFIG="brick/configs/base/busybox.config"
+BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES="brick/configs/busybox.fragment"
+BR2_UCLIBC_CONFIG="brick/configs/base/uclibc.config"
+BR2_UCLIBC_CONFIG_FRAGMENT_FILES="brick/configs/base/uclibc.config"
+
+BR2_ROOTFS_OVERLAY="brick/overlay"
+BR2_ROOTFS_POST_BUILD_SCRIPT="brick/post-build.sh"
+BR2_ROOTFS_POST_IMAGE_SCRIPT=""
+
+BR2_TARGET_GENERIC_HOSTNAME="brick"
+BR2_TARGET_GENERIC_ISSUE="Brick Linux"
+BR2_TARGET_GENERIC_ROOT_PASSWD=""
+
+BR2_CCACHE=y
+BR2_CCACHE_DIR="$(HOME)/.buildroot-ccache"
+BR2_CCACHE_INITIAL_SETUP=""
+BR2_CCACHE_USE_BASEDIR=y

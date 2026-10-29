@@ -1,0 +1,2 @@
+#!/bin/sh
+less -R /usr/share/brick/install-guide.txt 2>/dev/null || cat /usr/share/brick/install-guide.txt

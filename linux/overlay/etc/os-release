@@ -1,0 +1,5 @@
+NAME="Brick Linux"
+PRETTY_NAME="Brick Linux"
+ID=brick
+ID_LIKE=arch
+HOME_URL="https://www.roblox.com"

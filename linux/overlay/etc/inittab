@@ -1,0 +1,7 @@
+# /etc/inittab for Brick Linux (busybox init)
+::sysinit:/etc/init.d/rcS
+# The live environment logs in as root automatically, like the Arch install ISO.
+# Installed systems replace this line with a getty (see brickstrap).
+console::respawn:/bin/login -f root
+::ctrlaltdel:/sbin/reboot
+::shutdown:/etc/init.d/rcK

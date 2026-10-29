@@ -1,0 +1,39 @@
+#!/bin/sh
+# Brick Linux initramfs entry point.
+#
+# The kernel always carries the live/installer system. If the host passes
+# brick.root=/dev/vdaN and that partition holds an installed system, switch to
+# it; otherwise boot the live environment (like booting the Arch ISO).
+
+/bin/mount -t devtmpfs devtmpfs /dev
+/bin/mount -t proc proc /proc
+if (exec 0</dev/console) 2>/dev/null; then
+	exec 0</dev/console 1>/dev/console 2>/dev/console
+fi
+
+root=""
+live=""
+for arg in $(cat /proc/cmdline); do
+	case "$arg" in
+		brick.root=*) root="${arg#brick.root=}" ;;
+		brick.live=1) live=1 ;;
+	esac
+done
+
+if [ -z "$live" ] && [ -n "$root" ] && [ -b "$root" ]; then
+	mkdir -p /newroot
+	if mount -t ext2 "$root" /newroot 2>/dev/null; then
+		if [ -e /newroot/sbin/init ] && [ ! -e /newroot/etc/brick/live ]; then
+			echo "Booting installed system from $root"
+			mkdir -p /newroot/dev /newroot/proc
+			mount -o move /dev /newroot/dev
+			umount /proc
+			exec switch_root /newroot /sbin/init
+		fi
+		echo "$root has no installed system, starting the live environment"
+		umount /newroot
+	fi
+fi
+
+umount /proc
+exec /sbin/init

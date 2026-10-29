@@ -1,0 +1,24 @@
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export TERM=vt102
+export PAGER=less
+export EDITOR=vi
+export HOME="${HOME:-/root}"
+
+if [ "$(id -u)" = "0" ]; then
+	export PS1='\[\e[1;31m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]# '
+else
+	export PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]$ '
+fi
+
+alias ls='ls --color=auto'
+alias ll='ls -la'
+alias la='ls -A'
+
+for f in /etc/profile.d/*.sh; do
+	[ -r "$f" ] && . "$f"
+done
+
+if [ -e /etc/brick/live ] && [ -z "$BRICK_MOTD_SHOWN" ]; then
+	export BRICK_MOTD_SHOWN=1
+	cat /etc/brick/live-motd
+fi

@@ -1,0 +1,8 @@
+#!/bin/sh
+# System shutdown.
+for script in $(ls -r /etc/init.d/S* 2>/dev/null); do
+	[ -x "$script" ] && "$script" stop
+done
+sync
+umount -a -r 2>/dev/null
+exit 0

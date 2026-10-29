@@ -1,0 +1,50 @@
+#!/bin/sh
+# System startup.
+
+mount -t proc proc /proc 2>/dev/null
+mount -t sysfs sysfs /sys 2>/dev/null
+mount -t devtmpfs devtmpfs /dev 2>/dev/null
+mkdir -p /dev/pts /dev/shm /run /tmp /var/log /var/run /var/tmp
+mount -t devpts devpts /dev/pts 2>/dev/null
+mount -t tmpfs tmpfs /tmp 2>/dev/null
+mount -t tmpfs tmpfs /run 2>/dev/null
+mount -o remount,rw / 2>/dev/null
+
+# The host passes settings on the kernel command line.
+hostname=""
+ip=""
+now=""
+rows=25
+cols=80
+for arg in $(cat /proc/cmdline); do
+	case "$arg" in
+		brick.hostname=*) hostname="${arg#brick.hostname=}" ;;
+		brick.ip=*) ip="${arg#brick.ip=}" ;;
+		brick.time=*) now="${arg#brick.time=}" ;;
+		brick.rows=*) rows="${arg#brick.rows=}" ;;
+		brick.cols=*) cols="${arg#brick.cols=}" ;;
+	esac
+done
+
+[ -n "$now" ] && date -s "@$now" >/dev/null 2>&1
+stty -F /dev/console rows "$rows" cols "$cols" 2>/dev/null
+
+# The live system is named after its owner; installed systems use /etc/hostname.
+if [ ! -e /etc/brick/live ] && [ -s /etc/hostname ]; then
+	hostname -F /etc/hostname
+elif [ -n "$hostname" ]; then
+	hostname "$hostname"
+fi
+
+ifconfig lo 127.0.0.1 up 2>/dev/null
+if [ -n "$ip" ] && [ -e /sys/class/net/eth0 ]; then
+	ifconfig eth0 "$ip" netmask 255.255.0.0 up
+	route add default gw 10.0.0.1 2>/dev/null
+fi
+[ -e /etc/resolv.conf ] || echo "nameserver 10.0.0.1" > /etc/resolv.conf
+
+# Local services: any executable /etc/init.d/S* script, in order.
+for script in /etc/init.d/S*; do
+	[ -x "$script" ] && "$script" start
+done
+exit 0

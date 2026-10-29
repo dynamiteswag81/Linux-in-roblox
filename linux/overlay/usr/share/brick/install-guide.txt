@@ -1,0 +1,71 @@
+                     BRICK LINUX INSTALLATION GUIDE
+                     ==============================
+
+You are running the live environment from the computer's firmware. It is
+fully usable, but nothing you do here is kept. Installing puts Brick Linux on
+this computer's disk, where your files are saved with your Roblox account.
+
+(Press q to leave this guide. Re-open it any time with: install-guide)
+(In a hurry? "brickinstall" does all of this for you.)
+
+1. LOOK AT THE DISK
+
+       fdisk -l
+
+   Your computer has one disk: /dev/vda
+
+2. PARTITION THE DISK
+
+       fdisk /dev/vda
+
+   fdisk asks questions; answer them like this:
+       o        create a new empty partition table
+       n        new partition
+       p        primary
+       1        partition number 1
+       Enter    accept the default first sector
+       Enter    accept the default last sector (use the whole disk)
+       w        write the changes and quit
+
+3. FORMAT THE PARTITION
+
+       mkfs.ext2 /dev/vda1
+
+4. MOUNT IT
+
+       mount /dev/vda1 /mnt
+
+5. INSTALL THE BASE SYSTEM
+
+       brickstrap /mnt
+
+   You can add Community Workshop packages at the same time:
+
+       brickstrap /mnt hello
+
+6. CONFIGURE
+
+   Name your computer:
+       echo mycomputer > /mnt/etc/hostname
+
+   Set a root password (enter it twice):
+       brick-chroot /mnt passwd
+
+   See the fstab you would have (optional, just like Arch):
+       genfstab -U /mnt
+
+7. REBOOT
+
+       umount /mnt
+       reboot
+
+   The firmware boots your installed system from the disk from now on.
+   Log in as root with the password you chose.
+
+AFTER INSTALLING
+
+   brick search <words>     find software in the Community Workshop
+   brick install <name>     install it
+   brick new <name>         start your own package
+   brick publish <dir>      share it with everyone
+   ifconfig / ping / nc     talk to other players' computers

@@ -1,0 +1,84 @@
+name: Build Brick Linux image
+
+# Builds the RISC-V nommu kernel + initramfs with buildroot and commits the
+# result as Luau ModuleScripts (src/images/BrickLinux). The first build compiles
+# a toolchain (~1 hour); the download and ccache caches make later builds faster.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "linux/**"
+      - ".github/workflows/build-linux.yml"
+
+concurrency:
+  group: build-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install buildroot prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc cpio rsync unzip file wget python3 git libncurses-dev ccache
+
+      - name: Restore download and compiler caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/buildroot/dl
+            ~/.buildroot-ccache
+          key: brick-buildroot-${{ hashFiles('linux/configs/**') }}-${{ github.run_id }}
+          restore-keys: |
+            brick-buildroot-${{ hashFiles('linux/configs/**') }}-
+            brick-buildroot-
+
+      - name: Build
+        run: |
+          unset LD_LIBRARY_PATH
+          linux/build.sh build/buildroot 2>&1 | tee build.log | grep -E "^>>>|rror|warning: override" || true
+          test -f linux/out/Image || { tail -200 build.log; exit 1; }
+
+      - name: Show build summary
+        run: cat linux/out/build-info.txt
+
+      - name: Convert to Luau modules
+        run: |
+          python3 tools/image2luau.py linux/out/Image src/images/BrickLinux \
+            --name "Brick Linux" \
+            --description "Brick Linux kernel + live installer initramfs (built by CI from linux/)."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brick-linux-image
+          path: |
+            linux/out/Image
+            linux/out/build-info.txt
+            build.log
+
+      - name: Commit the new image
+        if: github.event_name != 'pull_request'
+        run: |
+          cp linux/out/build-info.txt src/images/BrickLinux/BUILD-INFO.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/images/BrickLinux
+          if git diff --cached --quiet; then
+            echo "Image unchanged."
+            exit 0
+          fi
+          git commit -m "Update Brick Linux image (built from ${GITHUB_SHA::8})"
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 5
+          done
+          exit 1

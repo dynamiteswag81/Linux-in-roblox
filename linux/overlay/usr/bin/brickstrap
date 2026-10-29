@@ -1,0 +1,52 @@
+#!/bin/sh
+# brickstrap - install Brick Linux into a mounted root, like Arch's pacstrap.
+#   brickstrap <root> [workshop packages...]
+
+die() { echo "brickstrap: $*" >&2; exit 1; }
+step() { printf '\033[1;32m==>\033[0m \033[1m%s\033[0m\n' "$*"; }
+
+target="${1%/}"
+[ -n "$target" ] || die "usage: brickstrap <root> [packages...]"
+[ -d "$target" ] || die "$target is not a directory"
+shift
+grep -q " $target " /proc/mounts || echo "warning: $target is not a mount point; files will not be saved to disk"
+
+step "Creating install root at $target"
+mkdir -p "$target/dev" "$target/proc" "$target/sys" "$target/tmp" "$target/run" \
+	"$target/root" "$target/home" "$target/mnt" "$target/var/log" "$target/var/tmp"
+chmod 1777 "$target/tmp" "$target/var/tmp"
+chmod 0700 "$target/root"
+
+step "Installing the base system"
+for d in bin sbin usr etc lib var; do
+	[ -d "/$d" ] || continue
+	printf '  copying /%s\n' "$d"
+	cp -a "/$d" "$target/" || die "copy of /$d failed (disk full?)"
+done
+rm -f "$target/etc/brick/live" "$target/etc/brick/live-motd"
+rm -rf "$target/var/run" "$target/var/tmp"/* 2>/dev/null
+ln -sf /run "$target/var/run"
+
+step "Configuring the installed system"
+cat > "$target/etc/inittab" <<'EOT'
+# /etc/inittab for an installed Brick Linux system (busybox init)
+::sysinit:/etc/init.d/rcS
+console::respawn:/sbin/getty -L 0 console vt102
+::ctrlaltdel:/sbin/reboot
+::shutdown:/etc/init.d/rcK
+EOT
+hostname > "$target/etc/hostname"
+cat > "$target/etc/motd" <<'EOT'
+
+Welcome to Brick Linux!  Get software from the Community Workshop:
+    brick search <words>      brick install <package>
+
+EOT
+
+if [ $# -gt 0 ]; then
+	step "Installing packages: $*"
+	BRICK_ROOT="$target" brick install "$@" || echo "warning: some packages failed to install"
+fi
+
+sync
+step "Done. Set a root password with: brick-chroot $target passwd"

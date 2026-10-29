@@ -1,0 +1,17 @@
+#!/bin/sh
+# brick-chroot - chroot into an installed system with /proc, /sys and /dev mounted.
+#   brick-chroot <root> [command...]
+root="${1%/}"
+[ -d "$root" ] || { echo "usage: brick-chroot <root> [command...]" >&2; exit 1; }
+shift
+mount -t proc proc "$root/proc"
+mount -t sysfs sysfs "$root/sys"
+mount -t devtmpfs devtmpfs "$root/dev"
+if [ $# -gt 0 ]; then
+	chroot "$root" "$@"
+else
+	chroot "$root" /bin/sh -l
+fi
+status=$?
+umount "$root/dev" "$root/sys" "$root/proc"
+exit $status

@@ -1,0 +1,32 @@
+#!/bin/sh
+# brickinstall - automatic installer for people who'd rather not do it by hand
+# (like archinstall). Wipes /dev/vda!
+
+disk=/dev/vda
+[ -b "$disk" ] || { echo "No disk found at $disk." >&2; exit 1; }
+[ -e /etc/brick/live ] || { echo "brickinstall only runs from the live environment." >&2; exit 1; }
+
+printf '\033[1mThis will ERASE everything on %s and install Brick Linux.\033[0m\n' "$disk"
+printf 'Type "yes" to continue: '
+read -r answer
+[ "$answer" = "yes" ] || { echo "Cancelled."; exit 1; }
+
+printf 'Computer name [%s]: ' "$(hostname)"
+read -r name
+[ -n "$name" ] || name="$(hostname)"
+
+set -e
+printf 'o\nn\np\n1\n\n\nw\n' | fdisk "$disk" >/dev/null
+sleep 1
+mkfs.ext2 -q "${disk}1"
+mkdir -p /mnt
+mount "${disk}1" /mnt
+brickstrap /mnt
+echo "$name" > /mnt/etc/hostname
+echo
+echo "Set a password for root (leave empty for none):"
+brick-chroot /mnt passwd -d root >/dev/null 2>&1 || true
+brick-chroot /mnt passwd root || true
+umount /mnt
+echo
+printf '\033[1;32mInstalled!\033[0m Type \033[1mreboot\033[0m to start your new system.\n'

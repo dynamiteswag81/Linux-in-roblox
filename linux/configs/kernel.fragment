@@ -1,0 +1,48 @@
+# Brick Linux kernel additions on top of base/kernel.config (cnlohr's mini-rv32ima config).
+# Applied with buildroot's BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES (merge_config.sh).
+
+CONFIG_LOCALVERSION="-brick"
+CONFIG_LOCALVERSION_AUTO=n
+CONFIG_CMDLINE="rw earlycon=uart8250,mmio,0x10000000,115200n8 console=ttyS0"
+
+# The console stays a polled 8250 UART. mini-rv32ima's custom HVC console isn't upstream.
+CONFIG_HVC_RISCV_MINIRV32=n
+
+# Interrupt controller for virtio devices.
+CONFIG_SIFIVE_PLIC=y
+
+# Persistent disk: virtio-blk + ext2 with MBR partitions (fdisk / mkfs.ext2 / mount).
+CONFIG_BLOCK=y
+CONFIG_BLK_DEV=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_EXT2_FS=y
+CONFIG_PARTITION_ADVANCED=n
+CONFIG_MSDOS_PARTITION=y
+CONFIG_MQ_IOSCHED_DEADLINE=n
+CONFIG_MQ_IOSCHED_KYBER=n
+CONFIG_TMPFS=y
+
+# Networking between player computers: IPv4 over virtio-net.
+CONFIG_NET=y
+CONFIG_INET=y
+CONFIG_UNIX=y
+CONFIG_PACKET=y
+CONFIG_IPV6=n
+CONFIG_SYN_COOKIES=n
+CONFIG_INET_DIAG=n
+CONFIG_NETFILTER=n
+CONFIG_WIRELESS=n
+CONFIG_WLAN=n
+CONFIG_ETHERNET=n
+CONFIG_NETDEVICES=y
+CONFIG_NET_CORE=y
+CONFIG_VIRTIO_NET=y
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_MMIO=y
+CONFIG_VIRTIO_MENU=y
+
+# Userspace conveniences (small).
+CONFIG_EPOLL=y
+CONFIG_SIGNALFD=y
+CONFIG_TIMERFD=y
+CONFIG_EVENTFD=y

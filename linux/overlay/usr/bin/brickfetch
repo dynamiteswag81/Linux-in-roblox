@@ -1,0 +1,17 @@
+#!/bin/sh
+# brickfetch - system information with a logo (like neofetch).
+. /etc/os-release 2>/dev/null
+up="$(cut -d. -f1 /proc/uptime)"
+mem_total="$(sed -n 's/^MemTotal: *\([0-9]*\).*/\1/p' /proc/meminfo)"
+mem_free="$(sed -n 's/^MemAvailable: *\([0-9]*\).*/\1/p' /proc/meminfo)"
+pkgs="$(ls /var/lib/brick/local 2>/dev/null | wc -l)"
+c='\033[1;31m'; b='\033[1m'; r='\033[0m'
+printf "${c}  .-------------.  ${r}${b}%s@%s${r}\n" "$(whoami)" "$(hostname)"
+printf "${c}  |[]|[]|[]|[]|[]|  ${r}-----------------\n"
+printf "${c}  |--+--+--+--+--|  ${r}${b}OS:${r} %s\n" "${PRETTY_NAME:-Brick Linux}"
+printf "${c}  |[]|[]|[]|[]|[]|  ${r}${b}Kernel:${r} %s\n" "$(uname -r)"
+printf "${c}  |--+--+--+--+--|  ${r}${b}CPU:${r} RISC-V rv32ima (emulated in Luau)\n"
+printf "${c}  |[]|[]|[]|[]|[]|  ${r}${b}Uptime:${r} %sm %ss\n" "$((up / 60))" "$((up % 60))"
+printf "${c}  '-------------'  ${r}${b}Memory:${r} %sK / %sK\n" "$((mem_total - mem_free))" "$mem_total"
+printf "                    ${b}Packages:${r} %s (brick)\n" "$pkgs"
+printf "                    ${b}Shell:${r} hush\n"
