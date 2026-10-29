@@ -58,6 +58,8 @@ export type Cpu = typeof(setmetatable(
 		priv: number,
 		wfi: boolean,
 		reservation: number,
+		-- Machine external interrupt line, driven by the PLIC.
+		meip: boolean,
 	},
 	Cpu
 ))
@@ -150,6 +152,7 @@ function Cpu.new(ram: buffer, mmio: MmioHandler): Cpu
 		priv = 3,
 		wfi = false,
 		reservation = -1,
+		meip = false,
 	}, Cpu)
 	return self
 end
@@ -176,6 +179,7 @@ function Cpu.reset(self: Cpu, pc: number, a0: number, a1: number)
 	self.priv = 3
 	self.wfi = false
 	self.reservation = -1
+	self.meip = false
 end
 
 local function readCsr(self: Cpu, csr: number, cycle: number): number
@@ -244,6 +248,12 @@ function Cpu.step(self: Cpu, count: number, elapsedUs: number): number
 	else
 		mip = band(mip, 0xFFFFFF7F)
 	end
+	if self.meip then
+		self.wfi = false
+		mip = bor(mip, 0x800)
+	else
+		mip = band(mip, 0xFFFFF7FF)
+	end
 	self.mip = mip
 
 	if self.wfi then
@@ -260,7 +270,11 @@ function Cpu.step(self: Cpu, count: number, elapsedUs: number): number
 	local ramLimit = ramSize - 3
 	local mmio = self.mmio
 
-	if band(mip, 0x80) ~= 0 and band(self.mie, 0x80) ~= 0 and band(self.mstatus, 0x8) ~= 0 then
+	local enabledPending = if band(self.mstatus, 0x8) ~= 0 then band(mip, self.mie) else 0
+	if band(enabledPending, 0x800) ~= 0 then
+		-- Machine external interrupt (PLIC).
+		trap = 0x8000000B
+	elseif band(enabledPending, 0x80) ~= 0 then
 		-- Machine timer interrupt.
 		trap = 0x80000007
 	else
@@ -335,6 +349,21 @@ function Cpu.step(self: Cpu, count: number, elapsedUs: number): number
 					addr = band(addr, 0xFFFFFFFF)
 					if addr >= 0x10000000 and addr < 0x12000000 then
 						rval = mmio.load(addr)
+						if f3 == 4 then
+							rval = band(rval, 0xFF)
+						elseif f3 == 5 then
+							rval = band(rval, 0xFFFF)
+						elseif f3 == 0 then
+							rval = band(rval, 0xFF)
+							if rval >= 0x80 then
+								rval += 0xFFFFFF00
+							end
+						elseif f3 == 1 then
+							rval = band(rval, 0xFFFF)
+							if rval >= 0x8000 then
+								rval += 0xFFFF0000
+							end
+						end
 					else
 						trap = 6 -- load access fault
 						rval = addr
@@ -400,6 +429,11 @@ function Cpu.step(self: Cpu, count: number, elapsedUs: number): number
 				else
 					addr = band(addr, 0xFFFFFFFF)
 					if addr >= 0x10000000 and addr < 0x12000000 then
+						if f3 == 0 then
+							rs2 = band(rs2, 0xFF)
+						elseif f3 == 1 then
+							rs2 = band(rs2, 0xFFFF)
+						end
 						local code = mmio.store(addr, rs2)
 						if code and code ~= 0 then
 							-- syscon: stop the CPU and report the request.

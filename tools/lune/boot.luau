@@ -20,7 +20,7 @@ local args = process.args
 local imagePath = args[1]
 assert(imagePath, "usage: boot.luau <Image> [--ram MB] [--seconds N] [--interp] [--until TEXT] [--type TEXT]")
 
-local opts = { ram = 16, seconds = 600, native = true, realtime = false }
+local opts = { ram = 32, seconds = 600, native = true, realtime = false }
 local i = 2
 while i <= #args do
 	local a = args[i]
@@ -44,8 +44,14 @@ end
 
 local root = Shim.mount("src/shared", "LinuxVM", { native = opts.native })
 local Machine = Shim.require(root.Emulator.Machine)
+local Disk = Shim.require(root.Emulator.Disk)
 
-local machine = Machine.new({ ramSize = opts.ram * 1024 * 1024 })
+local machine = Machine.new({
+	ramSize = opts.ram * 1024 * 1024,
+	disk = Disk.new(32 * 1024 * 1024),
+	mac = "\x02\x00\x0a\x00\x00\x02",
+	cmdline = "earlycon=uart8250,mmio,0x10000000,1000000 console=ttyS0 brick.ip=10.0.0.2 brick.hostname=tester brick.root=/dev/vda1",
+})
 machine:boot(buffer.fromstring(fs.readFile(imagePath)))
 
 local start = os.clock()

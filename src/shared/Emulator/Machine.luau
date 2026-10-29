@@ -2,44 +2,59 @@
 --[[
 	A complete virtual RISC-V computer: CPU + RAM + devices + boot logic.
 
-	Memory map (compatible with mini-rv32ima Linux images):
-		0x10000000  UART0 (8250/16550 subset)   -> console (/dev/ttyS0)
-		0x10000100  UART1 (8250/16550 subset)   -> host link (/dev/ttyS1, custom images only)
+	Memory map (a superset of mini-rv32ima's, so its Linux images boot too):
+		0x10000000  UART0, 8250/16550 subset         -> console, /dev/ttyS0
+		0x10001000  Host link mailbox                 -> `hostlink` tool (packages, workshop)
+		0x10002000  virtio-mmio block device, irq 1   -> /dev/vda
+		0x10003000  virtio-mmio network card, irq 2   -> eth0
+		0x10400000  PLIC interrupt controller
 		0x11000000  CLINT (mtimecmp @ +0x4000, mtime @ +0xBFF8)
 		0x11100000  SYSCON (write 0x5555 = power off, 0x7777 = reboot)
-		0x80000000  RAM (kernel image loaded at the start, DTB at the end)
+		0x80000000  RAM (kernel image at the start, device tree at the end)
 
-	The Machine is engine-agnostic: it only uses Luau builtins, so it runs the same
-	in Roblox (client, server or an Actor) and in the Lune test harness.
+	The Machine only uses Luau builtins, so it runs the same in Roblox (server,
+	client, or an Actor) and in the Lune test harness.
 ]]
 
 local Cpu = require(script.Parent.Cpu)
+local Disk = require(script.Parent.Disk)
 local Fdt = require(script.Parent.Fdt)
+local HostLink = require(script.Parent.HostLink)
+local Plic = require(script.Parent.Plic)
 local Uart = require(script.Parent.Uart)
+local VirtioBlk = require(script.Parent.VirtioBlk)
+local VirtioNet = require(script.Parent.VirtioNet)
 
 local RAM_BASE = 0x80000000
+local DTB_AREA = 16 * 1024
 
-local STEP_RUNNING = 0
 local STEP_WFI = 1
 local STEP_POWEROFF = 0x5555
 local STEP_REBOOT = 0x7777
 
+local IRQ_BLK = 1
+local IRQ_NET = 2
+
 export type MachineConfig = {
-	-- Bytes of guest RAM. 16 MB is plenty for a nommu busybox system.
+	-- Bytes of guest RAM. 32 MB leaves room for a few programs on an installed system.
 	ramSize: number?,
 	-- Kernel command line passed through the device tree.
 	cmdline: string?,
 	-- Guest timer ticks (microseconds) per executed instruction while busy.
-	-- Idle time (WFI) always follows the wall clock, so `sleep 1` stays accurate.
+	-- Idle time (WFI) always follows the host clock, so `sleep 1` stays accurate.
 	usPerInstruction: number?,
 	-- Instructions per CPU step call (interrupt latency vs. overhead).
 	batchSize: number?,
-	-- Whether to expose UART1 (the host link) in the device tree.
-	hostLink: boolean?,
+	-- Attach a disk (virtio-blk, /dev/vda).
+	disk: Disk.Disk?,
+	-- Attach a network card (virtio-net, eth0) with this 6-byte MAC address.
+	mac: string?,
 }
 
 local Machine = {}
 Machine.__index = Machine
+
+export type PowerEvent = "poweroff" | "reboot"
 
 export type Machine = typeof(setmetatable(
 	{} :: {
@@ -48,7 +63,10 @@ export type Machine = typeof(setmetatable(
 		ramSize: number,
 		cpu: Cpu.Cpu,
 		console: Uart.Uart,
-		hostLink: Uart.Uart,
+		hostLink: HostLink.HostLink,
+		plic: Plic.Plic,
+		blk: VirtioBlk.VirtioBlk?,
+		net: VirtioNet.VirtioNet?,
 		kernel: buffer?,
 		state: "off" | "running" | "halted",
 		instructions: number,
@@ -56,7 +74,7 @@ export type Machine = typeof(setmetatable(
 		usPerInstruction: number,
 		batchSize: number,
 		lastWall: number?,
-		onPowerOff: ((reason: "poweroff" | "reboot") -> ())?,
+		onPower: ((event: PowerEvent) -> ())?,
 		debugOutput: { string },
 	},
 	Machine
@@ -64,7 +82,7 @@ export type Machine = typeof(setmetatable(
 
 function Machine.new(config: MachineConfig?): Machine
 	local cfg: MachineConfig = config or {}
-	local ramSize = cfg.ramSize or 16 * 1024 * 1024
+	local ramSize = cfg.ramSize or 32 * 1024 * 1024
 	local ram = buffer.create(ramSize)
 
 	local self = setmetatable({
@@ -73,7 +91,10 @@ function Machine.new(config: MachineConfig?): Machine
 		ramSize = ramSize,
 		cpu = (nil :: any) :: Cpu.Cpu,
 		console = Uart.new(),
-		hostLink = Uart.new(),
+		hostLink = HostLink.new(ram),
+		plic = (nil :: any) :: Plic.Plic,
+		blk = nil,
+		net = nil,
 		kernel = nil,
 		state = "off",
 		instructions = 0,
@@ -81,20 +102,49 @@ function Machine.new(config: MachineConfig?): Machine
 		usPerInstruction = cfg.usPerInstruction or 0.25,
 		batchSize = cfg.batchSize or 2048,
 		lastWall = nil,
-		onPowerOff = nil,
+		onPower = nil,
 		debugOutput = {},
 	}, Machine)
 
+	local cpu: Cpu.Cpu
+	local plic = Plic.new(function(asserted)
+		cpu.meip = asserted
+	end)
+	self.plic = plic
+
+	local blk: VirtioBlk.VirtioBlk? = nil
+	if cfg.disk then
+		blk = VirtioBlk.new(ram, cfg.disk, function(high)
+			plic:setLevel(IRQ_BLK, high)
+		end)
+	end
+	self.blk = blk
+
+	local net: VirtioNet.VirtioNet? = nil
+	if cfg.mac then
+		net = VirtioNet.new(ram, cfg.mac, function(high)
+			plic:setLevel(IRQ_NET, high)
+		end)
+	end
+	self.net = net
+
 	local console = self.console
 	local hostLink = self.hostLink
-	local cpu: Cpu.Cpu
 
 	local mmio = {
 		load = function(addr: number): number
 			if addr < 0x10000100 then
 				return console:read(addr - 0x10000000)
-			elseif addr < 0x10000200 then
-				return hostLink:read(addr - 0x10000100)
+			elseif addr < 0x10001000 then
+				return 0
+			elseif addr < 0x10001100 then
+				return hostLink:read(addr - 0x10001000)
+			elseif addr >= 0x10002000 and addr < 0x10003000 then
+				return if blk then blk.transport:read(addr - 0x10002000) else 0
+			elseif addr >= 0x10003000 and addr < 0x10004000 then
+				return if net then net.transport:read(addr - 0x10003000) else 0
+			elseif addr >= 0x10400000 and addr < 0x10800000 then
+				return plic:read(addr - 0x10400000)
 			elseif addr == 0x1100BFF8 then
 				return cpu.timer % 4294967296
 			elseif addr == 0x1100BFFC then
@@ -109,8 +159,18 @@ function Machine.new(config: MachineConfig?): Machine
 		store = function(addr: number, value: number): number?
 			if addr < 0x10000100 then
 				console:write(addr - 0x10000000, value)
-			elseif addr < 0x10000200 then
-				hostLink:write(addr - 0x10000100, value)
+			elseif addr >= 0x10001000 and addr < 0x10001100 then
+				hostLink:write(addr - 0x10001000, value)
+			elseif addr >= 0x10002000 and addr < 0x10003000 then
+				if blk then
+					blk.transport:write(addr - 0x10002000, value)
+				end
+			elseif addr >= 0x10003000 and addr < 0x10004000 then
+				if net then
+					net.transport:write(addr - 0x10003000, value)
+				end
+			elseif addr >= 0x10400000 and addr < 0x10800000 then
+				plic:write(addr - 0x10400000, value)
 			elseif addr == 0x11004000 then
 				local hi = cpu.timermatch // 4294967296
 				cpu.timermatch = hi * 4294967296 + value
@@ -153,12 +213,13 @@ function Machine.buildDeviceTree(self: Machine, usableRam: number): buffer
 	local cpuIntc = fdt:phandle("cpu-intc")
 	local cpu0 = fdt:phandle("cpu0")
 	local syscon = fdt:phandle("syscon")
+	local plic = fdt:phandle("plic")
 
 	fdt:beginNode("")
 	fdt:propU32("#address-cells", 2)
 	fdt:propU32("#size-cells", 2)
 	fdt:propString("compatible", "riscv-minimal-nommu")
-	fdt:propString("model", "roblox-rv32ima")
+	fdt:propString("model", "Brick Computer (roblox-rv32ima)")
 
 	fdt:beginNode("chosen")
 	fdt:propString("bootargs", cfg.cmdline or "earlycon=uart8250,mmio,0x10000000,1000000 console=ttyS0")
@@ -209,11 +270,32 @@ function Machine.buildDeviceTree(self: Machine, usableRam: number): buffer
 	fdt:propString("compatible", "ns16850")
 	fdt:endNode()
 
-	if cfg.hostLink then
-		fdt:beginNode("uart@10000100")
-		fdt:propU32("clock-frequency", 0x1000000)
-		fdt:propCells("reg", { 0, 0x10000100, 0, 0x100 })
-		fdt:propString("compatible", "ns16850")
+	fdt:beginNode("interrupt-controller@10400000")
+	fdt:propU32("phandle", plic)
+	fdt:propStrings("compatible", { "sifive,plic-1.0.0", "riscv,plic0" })
+	fdt:propCells("reg", { 0, 0x10400000, 0, 0x400000 })
+	fdt:propCells("interrupts-extended", { cpuIntc, 11 })
+	fdt:propEmpty("interrupt-controller")
+	fdt:propU32("#interrupt-cells", 1)
+	fdt:propU32("#address-cells", 0)
+	fdt:propU32("riscv,ndev", 31)
+	fdt:endNode()
+
+	if self.blk then
+		fdt:beginNode("virtio_mmio@10002000")
+		fdt:propString("compatible", "virtio,mmio")
+		fdt:propCells("reg", { 0, 0x10002000, 0, 0x1000 })
+		fdt:propU32("interrupt-parent", plic)
+		fdt:propU32("interrupts", IRQ_BLK)
+		fdt:endNode()
+	end
+
+	if self.net then
+		fdt:beginNode("virtio_mmio@10003000")
+		fdt:propString("compatible", "virtio,mmio")
+		fdt:propCells("reg", { 0, 0x10003000, 0, 0x1000 })
+		fdt:propU32("interrupt-parent", plic)
+		fdt:propU32("interrupts", IRQ_NET)
 		fdt:endNode()
 	end
 
@@ -248,42 +330,54 @@ function Machine.buildDeviceTree(self: Machine, usableRam: number): buffer
 	return fdt:finish()
 end
 
--- Loads a kernel image (raw RISC-V "Image" with embedded initramfs) and resets the CPU.
-function Machine.boot(self: Machine, kernel: buffer?)
+-- Loads a kernel image (raw RISC-V "Image" with embedded initramfs) and resets everything.
+function Machine.boot(self: Machine, kernel: buffer?, cmdline: string?)
 	local image = kernel or self.kernel
 	assert(image, "Machine.boot: no kernel image")
 	self.kernel = image
+	if cmdline then
+		self.config.cmdline = cmdline
+	end
 
 	local ramSize = self.ramSize
 	local imageSize = buffer.len(image)
+	assert(imageSize < ramSize - DTB_AREA - 1024 * 1024, "kernel image does not fit in RAM")
 	buffer.fill(self.ram, 0, 0)
-
-	assert(imageSize < ramSize - 64 * 1024, "kernel image does not fit in RAM")
 	buffer.copy(self.ram, 0, image, 0, imageSize)
 
-	-- Reserve the last 16 KB of RAM for the DTB (keeps the usable size page-aligned).
-	local dtbArea = 16 * 1024
-	local usableRam = ramSize - dtbArea
+	-- The DTB sits in the last 16 KB of RAM, outside the memory Linux manages.
+	local usableRam = ramSize - DTB_AREA
 	local dtb = self:buildDeviceTree(usableRam)
-	assert(buffer.len(dtb) <= dtbArea, "device tree too large")
+	assert(buffer.len(dtb) <= DTB_AREA, "device tree too large")
 	buffer.copy(self.ram, usableRam, dtb, 0, buffer.len(dtb))
 
 	self.cpu:reset(RAM_BASE, 0, RAM_BASE + usableRam)
 	self.console:reset()
 	self.hostLink:reset()
+	self.plic:reset()
+	if self.blk then
+		self.blk.transport:reset()
+	end
+	if self.net then
+		self.net.transport:reset()
+	end
 	self.instructions = 0
 	self.pendingUs = 0
 	self.lastWall = nil
 	self.state = "running"
 end
 
+function Machine.powerOff(self: Machine)
+	self.state = "off"
+	self.lastWall = nil
+end
+
 --[[
 	Runs the machine for up to `budgetSeconds` of host time.
 
-	`now` is the host clock in seconds (os.clock() by default). When the guest is
-	idle (WFI) the call returns early so the host frame isn't wasted; guest time
-	then advances with the wall clock. Set `fastForward` to skip idle time
-	entirely (useful for headless booting and tests).
+	When the guest is idle (WFI) the call returns early so the host frame isn't
+	wasted; guest time then advances with the host clock between calls. Set
+	`fastForward` to skip idle time instead (headless boots and tests).
 
 	Returns the number of instructions executed.
 ]]
@@ -322,20 +416,15 @@ function Machine.run(self: Machine, budgetSeconds: number, fastForward: boolean?
 				if wait > 0 then
 					self.pendingUs += wait
 				end
-				if self.console:hasInput() then
-					self.pendingUs += 1000
-				end
 			else
 				break
 			end
 		elseif ret == STEP_POWEROFF or ret == STEP_REBOOT then
+			local event: PowerEvent = if ret == STEP_POWEROFF then "poweroff" else "reboot"
 			self.state = "halted"
-			local callback = self.onPowerOff
-			if callback then
-				callback(if ret == STEP_POWEROFF then "poweroff" else "reboot")
-			end
-			if ret == STEP_REBOOT and self.kernel then
-				self:boot()
+			local onPower = self.onPower
+			if onPower then
+				onPower(event)
 			end
 			break
 		end
