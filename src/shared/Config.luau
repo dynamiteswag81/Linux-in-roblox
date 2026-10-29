@@ -88,6 +88,13 @@ local Config = {
 	DNS_SUFFIX = "brick",
 	-- Frames per second one computer may send before the switch drops them.
 	MAX_FRAMES_PER_SECOND = 400,
+	-- Each server has one player, so other players' computers are in other
+	-- servers. Packets to them go out in MessagingService messages (several per
+	-- message, up to this many messages per second; MessagingService allows a
+	-- one-player server 14/s and `msg` needs a few). The directory of online
+	-- computers is a MemoryStore sorted map.
+	RELAY_MESSAGES_PER_SECOND = 10,
+	NET_DIRECTORY = "BrickNet_v1",
 }
 
 return Config

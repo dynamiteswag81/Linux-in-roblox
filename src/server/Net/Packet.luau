@@ -1,7 +1,8 @@
 --!strict
 --[[
 	Helpers for reading and building the few packet types the game's virtual
-	gateway understands: Ethernet, ARP, IPv4, ICMP echo, UDP, DNS, TCP resets.
+	gateway understands: Ethernet, ARP, IPv4, ICMP echo, UDP, DNS, TCP resets,
+	and address translation for packets relayed between servers.
 	Frames are Luau strings.
 ]]
 
@@ -184,6 +185,73 @@ function Packet.tcpReset(src: string, dst: string, segment: string): string?
 	local pseudo = dst .. src .. string.pack(">BBI2", 0, Packet.PROTO_TCP, #header)
 	local sum = Packet.checksum(pseudo .. header)
 	return string.sub(header, 1, 16) .. string.pack(">I2", sum) .. string.sub(header, 19)
+end
+
+--[[
+	Rewrites an IPv4 packet's source and destination (the gateway's address
+	translation for computers in other servers) and fixes the IP, TCP and UDP
+	checksums. TCP SYNs get their MSS option lowered to `maxMss` so the other
+	side's segments stay small enough to relay. Returns nil for packets it
+	can't translate (fragments, malformed headers).
+]]
+function Packet.translate(packet: string, src: string, dst: string, maxMss: number?): string?
+	if #packet < 20 or string.byte(packet, 1) // 16 ~= 4 then
+		return nil
+	end
+	local ihl = (string.byte(packet, 1) % 16) * 4
+	local total = Packet.u16(packet, 3)
+	if ihl < 20 or total < ihl or total > #packet then
+		return nil
+	end
+	if bit32.band(Packet.u16(packet, 7), 0x3FFF) ~= 0 then
+		return nil -- a fragment (more-fragments flag or an offset)
+	end
+	local proto = string.byte(packet, 10)
+	local body = string.sub(packet, ihl + 1, total)
+	if proto == Packet.PROTO_TCP then
+		if #body < 20 then
+			return nil
+		end
+		local offset = (string.byte(body, 13) // 16) * 4
+		if offset < 20 or offset > #body then
+			return nil
+		end
+		if maxMss and bit32.btest(string.byte(body, 14), 0x02) then
+			local pos = 21
+			while pos < offset do
+				local kind = string.byte(body, pos)
+				if kind == 0 then
+					break
+				elseif kind == 1 then
+					pos += 1
+				else
+					local len = string.byte(body, pos + 1) or 0
+					if len < 2 then
+						break
+					end
+					if kind == 2 and len == 4 and Packet.u16(body, pos + 2) > maxMss then
+						body = string.sub(body, 1, pos + 1) .. string.pack(">I2", maxMss) .. string.sub(body, pos + 4)
+					end
+					pos += len
+				end
+			end
+		end
+		body = string.sub(body, 1, 16) .. "\0\0" .. string.sub(body, 19)
+		local sum = Packet.checksum(src .. dst .. string.pack(">BBI2", 0, proto, #body) .. body)
+		body = string.sub(body, 1, 16) .. string.pack(">I2", sum) .. string.sub(body, 19)
+	elseif proto == Packet.PROTO_UDP then
+		if #body < 8 then
+			return nil
+		end
+		if Packet.u16(body, 7) ~= 0 then
+			body = string.sub(body, 1, 6) .. "\0\0" .. string.sub(body, 9)
+			local sum = Packet.checksum(src .. dst .. string.pack(">BBI2", 0, proto, #body) .. body)
+			body = string.sub(body, 1, 6) .. string.pack(">I2", if sum == 0 then 0xFFFF else sum) .. string.sub(body, 9)
+		end
+	end
+	local header = string.sub(packet, 1, 10) .. "\0\0" .. src .. dst .. string.sub(packet, 21, ihl)
+	local sum = Packet.checksum(header)
+	return string.sub(header, 1, 10) .. string.pack(">I2", sum) .. string.sub(header, 13) .. body
 end
 
 export type DnsQuestion = { id: number, name: string, qtype: number, raw: string }

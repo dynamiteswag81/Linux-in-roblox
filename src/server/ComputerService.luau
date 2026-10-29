@@ -31,6 +31,7 @@ local Computer = require(script.Parent.Computer)
 local DiskStore = require(script.Parent.DiskStore)
 local HostLinkCommands = require(script.Parent.HostLinkCommands)
 local NetworkService = require(script.Parent.NetworkService)
+local CrossServer = require(script.Parent.Net.CrossServer)
 local OfficialPackages = require(script.Parent.OfficialPackages)
 local WorkshopService = require(script.Parent.WorkshopService)
 local WorkshopWeb = require(script.Parent.WorkshopWeb)
@@ -124,10 +125,15 @@ local workshop = WorkshopService.new({
 })
 local network = NetworkService.new()
 local commands = HostLinkCommands.new(workshop, network, {
-	-- Player-to-player messages (`msg`) are filtered like private chat.
+	-- Player-to-player messages (`msg`) are filtered like private chat. The
+	-- recipient is normally in another server (one player per server), where
+	-- per-recipient filtering isn't available: those get the strictest filter.
 	filterMessage = function(text: string, fromUserId: number, toUserId: number): string
 		local result = TextService:FilterStringAsync(text, fromUserId, Enum.TextFilterContext.PrivateChat)
-		return result:GetChatForUserAsync(toUserId)
+		if Players:GetPlayerByUserId(toUserId) then
+			return result:GetChatForUserAsync(toUserId)
+		end
+		return result:GetNonChatStringForBroadcastAsync()
 	end,
 	notifyMessage = function(toUserId: number, fromName: string, text: string)
 		local target = Players:GetPlayerByUserId(toUserId)
@@ -144,6 +150,19 @@ network:serveHttp(function(request, respond)
 		respond(if ok then result else "HTTP/1.0 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n")
 	end)
 end)
+
+-- Other players' computers are in other servers.
+do
+	local ok, remote = pcall(CrossServer.new, network)
+	if ok then
+		network:setRemote(remote)
+	else
+		warn("[Linux] Computers can't reach other servers: " .. tostring(remote))
+	end
+end
+network.onChat = function(toUserId: number, fromName: string, text: string)
+	commands:deliver(toUserId, fromName, text)
+end
 
 ComputerService.workshop = workshop
 ComputerService.network = network

@@ -1,6 +1,9 @@
 --[[
-	A headless "server" with real services and several computers, for
-	end-to-end tests of the workshop, package manager and network.
+	Headless game servers with real services, one computer each (like the game:
+	one player per server), for end-to-end tests of the workshop, package
+	manager and network. The servers share a workshop store and are linked by
+	an in-process bus standing in for MessagingService and MemoryStore, so
+	traffic between computers takes the same cross-server path as in the game.
 
 	lune run tools/lune/world.luau <script.txt>
 	lune run tools/lune/world.luau -e "alice: uname -a" -e "bob: ping -c 1 alice"
@@ -59,12 +62,66 @@ local function memoryStore()
 end
 
 local workshop = WorkshopService.new({ store = memoryStore(), official = OfficialPackages.build() })
-local network = NetworkService.new()
-local commands = HostLinkCommands.new(workshop, network)
 local WorkshopWeb = Shim.require(root.LinuxServer.WorkshopWeb)
-network:serveHttp(function(request, respond)
-	respond(WorkshopWeb.handle(workshop, request))
-end)
+
+-- The cross-server bus: a directory of online computers and in-flight messages.
+local directory = {}
+local serverOf = {}
+local inFlight = {}
+local relayStats = { messages = 0, bytes = 0, largest = 0 }
+
+local function newServer()
+	local network = NetworkService.new()
+	local commands = HostLinkCommands.new(workshop, network)
+	network:serveHttp(function(request, respond)
+		respond(WorkshopWeb.handle(workshop, request))
+	end)
+	network.onChat = function(toUserId, fromName, text)
+		commands:deliver(toUserId, fromName, text)
+	end
+	network:setRemote({
+		lookup = function(hostname)
+			return directory[hostname]
+		end,
+		list = function()
+			local out = {}
+			for _, entry in directory do
+				table.insert(out, entry)
+			end
+			return out
+		end,
+		register = function(entry)
+			directory[entry.hostname] = entry
+			serverOf[entry.userId] = network
+		end,
+		unregister = function(entry)
+			if directory[entry.hostname] and directory[entry.hostname].userId == entry.userId then
+				directory[entry.hostname] = nil
+			end
+			serverOf[entry.userId] = nil
+		end,
+		send = function(toUserId, message)
+			-- MessagingService's limit is 1 KB per message.
+			assert(#message <= 1000, "relay message too big: " .. #message)
+			relayStats.messages += 1
+			relayStats.bytes += #message
+			relayStats.largest = math.max(relayStats.largest, #message)
+			table.insert(inFlight, { to = toUserId, message = message })
+		end,
+	})
+	return network, commands
+end
+
+local function deliverInFlight()
+	local batch = inFlight
+	inFlight = {}
+	for _, item in batch do
+		local network = serverOf[item.to]
+		if network then
+			network:receiveRemote(item.message)
+		end
+	end
+end
 
 local computers = {}
 local order = {}
@@ -77,6 +134,7 @@ local function getComputer(name)
 	end
 	local userId = nextUserId
 	nextUserId += 1
+	local network, commands = newServer()
 	local hostname = NetworkService.hostnameFor(name)
 	local ipText, ipBytes, mac = network:allocateAddress()
 	local computer = Computer.new({
@@ -110,7 +168,7 @@ local function getComputer(name)
 		network:transmit(endpoint, frame)
 	end
 	network:attach(endpoint)
-	c = { computer = computer, name = name }
+	c = { computer = computer, name = name, network = network }
 	computers[name] = c
 	table.insert(order, name)
 	computer:pressPower(os.clock())
@@ -124,11 +182,12 @@ local function runAll(seconds)
 	while os.clock() - t < seconds do
 		local now = os.clock()
 		for _, name in order do
-			local computer = computers[name].computer
-			computer:update(now, 0.01)
-			computer:takeStream(now)
+			local c = computers[name]
+			c.computer:update(now, 0.01)
+			c.computer:takeStream(now)
+			c.network:tick()
 		end
-		network:tick()
+		deliverInFlight()
 	end
 end
 
@@ -262,6 +321,10 @@ for _, line in lines do
 			print("? " .. line)
 		end
 	end
+end
+if relayStats.messages > 0 then
+	print(string.format("[relay] %d messages between servers, %d bytes, largest %d",
+		relayStats.messages, relayStats.bytes, relayStats.largest))
 end
 print(string.format("%d expectation(s) failed", failures))
 process.exit(if failures == 0 then 0 else 1)

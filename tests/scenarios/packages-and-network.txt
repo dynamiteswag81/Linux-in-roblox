@@ -20,3 +20,10 @@ alice: brick install webserver browse
 bob: brick install browse
 bob: wget -q -O - http://alice/ | head -5
 @expect bob Welcome to my computer
+# Messages and name lookups across servers (each computer is in its own server).
+bob: msg alice hello from bob
+@expect bob Sent to alice
+alice: msg
+@expect alice bob: hello from bob
+alice: ping -c 1 bob
+@expect alice PING bob (10.1.0.

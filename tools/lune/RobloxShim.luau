@@ -15,6 +15,7 @@
 
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
+local task = require("@lune/task")
 
 local Shim = {}
 
@@ -142,6 +143,11 @@ local function requireNode(node: Node): any
 			table.insert(names, name)
 			table.insert(values, value)
 		end
+	end
+	-- `task` is a global in Roblox but a library in Lune.
+	if not (inject and inject.task) then
+		table.insert(names, "task")
+		table.insert(values, task)
 	end
 	local header = "local script, require" .. (if #names > 0 then ", " .. table.concat(names, ", ") else "") .. " = ...; "
 	local lines = string.split(source, "\n")

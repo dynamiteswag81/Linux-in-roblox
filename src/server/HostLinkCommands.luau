@@ -95,11 +95,12 @@ function HostLinkCommands._send(self: HostLinkCommands, owner: Owner, args: { st
 	if last and now - last < MESSAGE_COOLDOWN then
 		return false, "msg: slow down a little"
 	end
-	local target = self.network:find(to)
-	if not target or not target.userId then
+	-- In this server or another one (each server has one player).
+	local target = self.network:findAnywhere(to)
+	if not target then
 		return false, "msg: " .. to .. " isn't online"
 	end
-	local toUserId = target.userId :: number
+	local toUserId = target.userId
 	local filter = self.options.filterMessage
 	if filter then
 		local ok, filtered = pcall(filter, text, owner.userId, toUserId)
@@ -109,17 +110,35 @@ function HostLinkCommands._send(self: HostLinkCommands, owner: Owner, args: { st
 		text = filtered
 	end
 	self.lastMessage[owner.userId] = now
+	if self.network.byUser[toUserId] then
+		self:deliver(toUserId, owner.name, text)
+	else
+		local sender = self.network.byUser[owner.userId]
+		local from = {
+			userId = owner.userId,
+			owner = owner.name,
+			hostname = if sender then sender.hostname else NetworkService.hostnameFor(owner.name),
+		}
+		if not self.network:sendChat(from, toUserId, text) then
+			return false, "msg: " .. to .. " isn't reachable"
+		end
+	end
+	return true, "Sent to " .. target.owner .. ".\n"
+end
+
+-- Puts a message in a player's inbox (from this server or another one).
+function HostLinkCommands.deliver(self: HostLinkCommands, toUserId: number, fromName: string, text: string)
 	local inbox = self.inboxes[toUserId] or {}
 	self.inboxes[toUserId] = inbox
-	table.insert(inbox, { from = owner.name, text = text, time = now })
+	local clean = string.sub((string.gsub(text, "[%c]", " ")), 1, MAX_MESSAGE)
+	table.insert(inbox, { from = fromName, text = clean, time = self.now() })
 	while #inbox > MAX_INBOX do
 		table.remove(inbox, 1)
 	end
 	local notify = self.options.notifyMessage
 	if notify then
-		pcall(notify, toUserId, owner.name, text)
+		pcall(notify, toUserId, fromName, clean)
 	end
-	return true, "Sent to " .. target.owner .. ".\n"
 end
 
 function HostLinkCommands._receive(self: HostLinkCommands, owner: Owner): string
@@ -198,7 +217,7 @@ function HostLinkCommands._who(self: HostLinkCommands, hostsFormat: boolean): st
 		table.insert(out, "127.0.0.1\tlocalhost")
 		table.insert(out, "10.0.0.1\tgateway workshop")
 	end
-	for _, e in self.network:list() do
+	for _, e in self.network:listAll() do
 		if hostsFormat then
 			table.insert(out, Packet.ipToString(e.ip) .. "\t" .. e.hostname)
 		else

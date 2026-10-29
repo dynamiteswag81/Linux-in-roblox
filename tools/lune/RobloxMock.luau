@@ -544,6 +544,60 @@ function Mock.createWorld()
 		}
 	end
 
+	-- MemoryStore sorted maps (in memory) and MessagingService (loopback in
+	-- this one server), enough for the cross-server network.
+	local sortedMaps = {}
+	local memoryStoreService = {}
+	function memoryStoreService:GetSortedMap(name)
+		local data = sortedMaps[name] or {}
+		sortedMaps[name] = data
+		local map = {}
+		function map:SetAsync(key, value, _expiration)
+			data[key] = value
+			return true
+		end
+		function map:GetAsync(key)
+			return data[key]
+		end
+		function map:RemoveAsync(key)
+			data[key] = nil
+		end
+		function map:GetRangeAsync(_direction, count)
+			local keys = {}
+			for key in data do
+				table.insert(keys, key)
+			end
+			table.sort(keys)
+			local out = {}
+			for i = 1, math.min(count, #keys) do
+				out[i] = { key = keys[i], value = data[keys[i]] }
+			end
+			return out
+		end
+		return map
+	end
+	world.messages = {}
+	local topics = {}
+	local messagingService = {}
+	function messagingService:SubscribeAsync(topic, callback)
+		topics[topic] = callback
+		return {
+			Disconnect = function()
+				if topics[topic] == callback then
+					topics[topic] = nil
+				end
+			end,
+		}
+	end
+	function messagingService:PublishAsync(topic, data)
+		assert(#data <= 1024, "MessagingService messages are limited to 1 KB")
+		table.insert(world.messages, topic)
+		local callback = topics[topic]
+		if callback then
+			task.spawn(callback, { Data = data, Sent = os.time() })
+		end
+	end
+
 	world.keysDown = {}
 	local uis = { TouchEnabled = false }
 	function uis:IsKeyDown(kc)
@@ -566,6 +620,8 @@ function Mock.createWorld()
 			RunService = runService(isServer),
 			CollectionService = collection,
 			DataStoreService = dataStoreService,
+			MemoryStoreService = memoryStoreService,
+			MessagingService = messagingService,
 			TextService = textService,
 			StarterGui = starterGui,
 			TextChatService = textChat,
