@@ -2,6 +2,28 @@
 
 Living document: what works, what's next. Each work session updates it.
 
+## Design constraints from the owner
+
+- **One player per server.** Each server runs exactly one person's computer.
+  Consequences:
+  - The in-game internet can't stay inside one server: other players' computers
+    are on other servers. It needs a cross-server relay (MessagingService for
+    frames/messages, MemoryStore for the directory of online computers and
+    globally unique addresses). Budget: about 840 messages/min of up to 1 KB
+    per one-player server, with up to about 1 s of latency. That's enough for
+    ping, `msg`, `talk` and small web pages, not for bulk transfers.
+  - Offline players' computers aren't running, so their websites are down while
+    they're away (an optional "hosted pages" feature could serve a published
+    copy).
+  - `msg` must reach other servers (MessagingService), plus a DataStore inbox
+    for players who are offline.
+  - The whole server CPU belongs to one VM: raise the per-frame budget
+    (`Config.FRAME_BUDGET` / `MAX_COMPUTER_BUDGET`) and consider running it in an
+    Actor.
+  - Showing your screen to other players (docs/MODERATION.md item 1) no longer
+    applies.
+  - The flash drive, desks and the Workshop are unaffected.
+
 ## Status
 
 ### Done and tested headless (Lune)
@@ -58,27 +80,30 @@ small fixes on first run (see the checklist in docs/SETUP.md).
    `Config.REQUIRE_FLASH_DRIVE` (off for Studio testing without the mechanic).
    Document it in docs/SETUP.md. (Guest side is done: `/init` no longer falls
    back to the live system when booted from disk.)
-3. **Built from scratch:** remove the copied prebuilt `src/images/MiniLinux` image
+3. **Cross-server internet** (see Design constraints): relay network frames and
+   `msg` between servers, a directory of online computers (`net.who`, DNS), unique
+   addresses, and a bigger CPU budget for the single VM.
+4. **Built from scratch:** remove the copied prebuilt `src/images/MiniLinux` image
    and its fallback boot entry; README section on what is written for this
    project (emulator, devices, terminal, firmware, OS integration, packages) vs.
    upstream sources we compile (Linux, busybox, uClibc via buildroot).
-4. **Monitor for desktop environments:** `simple-framebuffer` in guest RAM
+5. **Monitor for desktop environments:** `simple-framebuffer` in guest RAM
    (kernel `CONFIG_FB_SIMPLE`), virtio-input for keyboard + mouse (`evdev`), a guest
    drawing tool so shell scripts can draw, server-side dirty-tile streaming, client
    rendering on the desk's monitor with EditableImage.
-5. **Docs:** player guide (installing, packages, network), package authoring guide,
+6. **Docs:** player guide (installing, packages, network), package authoring guide,
    flash-drive integration guide for the owner; confirm disk saving across visits
    (DiskStore, autosave, save on leave/shutdown) and document it.
-6. **Studio smoke test** with the owner, and fixes from it.
-7. **Speed / scale:** run VMs in Actors for multi-core servers; an instruction decode
+7. **Studio smoke test** with the owner, and fixes from it.
+8. **Speed / scale:** run VMs in Actors for multi-core servers; an instruction decode
    cache for 2x interpreted speed (for client-side VMs).
-8. **Snapshots:** save a booted machine's RAM so power-on can resume instantly,
+9. **Snapshots:** save a booted machine's RAM so power-on can resume instantly,
    and suspend computers whose owner hasn't touched them for a while.
-9. **Installer polish:** password prompt on first boot of an installed system,
-   `brickinstall` as a dialog, progress output in `brick`.
-10. **Workshop:** likes/ratings, "my packages" view, unpublish from the GUI, package
+10. **Installer polish:** password prompt on first boot of an installed system,
+    `brickinstall` as a dialog, progress output in `brick`.
+11. **Workshop:** likes/ratings, "my packages" view, unpublish from the GUI, package
     screenshots (text previews).
-11. **More software:** an `edit` text editor that's friendlier than vi, games
+12. **More software:** an `edit` text editor that's friendlier than vi, games
     (2048, tetris), a `man`-style help system.
 
 ## Decisions waiting on the owner
@@ -86,5 +111,6 @@ small fixes on first run (see the checklist in docs/SETUP.md).
 - Moderation choices in `docs/MODERATION.md` (screen sharing, package contents, raw
   network traffic like `talk`/`webserver`).
 - Game name / OS name (currently "Brick Linux", `Config.OS_NAME`).
-- Whether VMs should run on the server (current) or on each player's client.
+- ~~Whether VMs should run on the server or on each player's client.~~ Settled by
+  one-player servers: the VM stays on the server, which is dedicated to that player.
 - Memory: 32 MB RAM per running computer (`Config.RAM_MB`).
