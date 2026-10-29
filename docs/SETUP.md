@@ -78,7 +78,8 @@ DataStore names, workshop limits, network settings.
    Ctrl/Alt latches, arrows, F-keys and the computer's buttons.
 2. Press **⏻ Power**. The firmware (BrickBIOS) counts down and boots Linux.
 3. The first time, you're in the **live installer**: run `install-guide` and install
-   Brick Linux to your disk Arch-style, or run `brickinstall` to do it automatically.
+   Brick Linux to your disk Arch-style. (The only shortcut will be the paid
+   auto-install button in your game's GUI; see docs/ROADMAP.md.)
 4. After a reboot your installed system starts, and it's saved with your account.
 5. `brick search`, `brick install <pkg>`, `brick publish <dir>`: packages from and to
    the Community Workshop. `ping <username>`, `talk`, `browse`: the in-game network.

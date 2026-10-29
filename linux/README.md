@@ -33,7 +33,9 @@ python3 tools/image2luau.py linux/out/Image src/images/BrickLinux --name "Brick 
    line: `brick.hostname=`, `brick.ip=`, `brick.time=`, `brick.root=/dev/vda1`.
 2. `/init` mounts `brick.root`. If it holds an installed system it `switch_root`s
    to it; otherwise the **live installer** starts (auto-login as root).
-3. The player installs to disk Arch-style (`install-guide`), or runs `brickinstall`.
+3. The player installs to disk Arch-style (`install-guide`). The only shortcut is
+   the paid auto-install button in the game's GUI, which writes the system to the
+   disk from the server.
 
 ## Host link
 

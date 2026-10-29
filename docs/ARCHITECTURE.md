@@ -40,7 +40,7 @@ RAM `0x80000000`.
 Linux 6.8 (RV32 no-MMU) + busybox + uClibc, built by buildroot in GitHub Actions and
 committed as `src/images/BrickLinux`. The initramfs is the live installer; `/init`
 switches to an installed system on `/dev/vda1` if there is one. Brick Linux's own tools
-(`brick`, `brickstrap`, `brickinstall`, `install-guide`) are shell scripts in
+(`brick`, `brickstrap`, `install-guide`) are shell scripts in
 `linux/overlay`. See `linux/README.md`.
 
 ## Server (`src/server`)

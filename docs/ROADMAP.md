@@ -35,7 +35,7 @@ the server (`MarketplaceService:UserOwnsGamePassAsync`, re-checked after
   computer's screen or firmware. The button asks the server, which checks the pass
   and writes a ready-made system straight to the player's disk (a server API such as
   `ComputerService.autoInstall(player)`). That's instant and needs no flash drive
-  or typing. Open question: whether `brickinstall` in the live system stays free.
+  or typing. This is the only shortcut: the free `brickinstall` script was removed.
 - **More disk space.** Free disks are `Config.DISK_MB` (32 MB). Cleanest as a
   second drive (`/dev/vdb`, "install a bigger hard drive") rather than growing
   `/dev/vda`, because a grown disk still needs its partition and ext2 resized
@@ -64,7 +64,7 @@ Workshop publishing slots, cosmetic desks and monitors.
   device tree.
 - **Brick Linux** (built by CI from `linux/`): live installer with busybox (vi, less,
   awk, tar, fdisk, mkfs.ext2, wget, nc, httpd...), `brick` package manager,
-  `brickstrap`/`brick-chroot`/`genfstab`/`brickinstall`, `install-guide`, `msg`.
+  `brickstrap`/`brick-chroot`/`genfstab`, `install-guide`, `msg`.
   Guest bugs found and fixed: uClibc riscv32 64-bit syscall arguments (vi saved
   empty files), busybox's 4 KB stack (any `$(a | b)` crashed the shell), `/init`
   PATH, brickstrap ordering.
@@ -127,7 +127,7 @@ small fixes on first run (see the checklist in docs/SETUP.md).
 9. **Snapshots:** save a booted machine's RAM so power-on can resume instantly,
    and suspend computers whose owner hasn't touched them for a while.
 10. **Installer polish:** password prompt on first boot of an installed system,
-    `brickinstall` as a dialog, progress output in `brick`.
+    progress output in `brick`.
 11. **Workshop:** likes/ratings, "my packages" view, unpublish from the GUI, package
     screenshots (text previews).
 12. **More software:** an `edit` text editor that's friendlier than vi, games

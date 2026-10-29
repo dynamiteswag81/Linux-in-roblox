@@ -6,7 +6,6 @@ fully usable, but nothing you do here is kept. Installing puts Brick Linux on
 this computer's disk, where your files are saved with your Roblox account.
 
 (Press q to leave this guide. Re-open it any time with: install-guide)
-(In a hurry? "brickinstall" does all of this for you.)
 
 1. LOOK AT THE DISK
 
