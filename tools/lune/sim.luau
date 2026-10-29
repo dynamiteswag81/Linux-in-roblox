@@ -122,6 +122,13 @@ check(powerButton ~= nil, "on-screen Power button exists")
 powerButton.Activated:Fire()
 pump(1.5)
 check(string.find(screenText(), "BrickBIOS", 1, true) ~= nil or string.find(screenText(), "Memory", 1, true) ~= nil, "firmware screen shows on the desk")
+check(desk:GetAttribute("FlashDrive") == false, "desk has a FlashDrive attribute (no drive yet)")
+check(string.find(screenText(), "No bootable device", 1, true) ~= nil, "empty disk and no flash drive: nothing to boot")
+
+-- The game's flash drive mechanic plugs the installer in; the firmware notices.
+desk:SetAttribute("FlashDrive", true)
+pump(1.5)
+check(string.find(screenText(), "installer flash drive", 1, true) ~= nil, "firmware sees the flash drive")
 
 local deadline = os.clock() + 60
 while os.clock() < deadline and not string.find(screenText(), "root@alice", 1, true) do

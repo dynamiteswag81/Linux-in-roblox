@@ -142,6 +142,22 @@ function METHODS.GetPropertyChangedSignal(self, prop)
 	return signalFor(self, "prop:" .. prop)
 end
 
+function METHODS.GetAttributeChangedSignal(self, name)
+	return signalFor(self, "attr:" .. name)
+end
+
+function METHODS.SetAttribute(self, name, value)
+	local real = realOf[self]
+	local old = real:GetAttribute(name)
+	real:SetAttribute(name, unwrap(value))
+	if old ~= value then
+		local s = info(self).signals["attr:" .. name]
+		if s then
+			s:Fire()
+		end
+	end
+end
+
 function METHODS.WaitForChild(self, name, timeout)
 	local deadline = os.clock() + (timeout or 5)
 	while true do

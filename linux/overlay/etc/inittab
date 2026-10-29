@@ -2,6 +2,8 @@
 ::sysinit:/etc/init.d/rcS
 # The live environment logs in as root automatically, like the Arch install ISO.
 # Installed systems replace this line with a getty (see brickstrap).
-console::respawn:/bin/login -f root
+# It runs on ttyS0, not "console": /dev/console can't be a controlling
+# terminal, so Ctrl-C and job control wouldn't work there.
+ttyS0::respawn:/bin/login -f root
 ::ctrlaltdel:/sbin/reboot
 ::shutdown:/etc/init.d/rcK

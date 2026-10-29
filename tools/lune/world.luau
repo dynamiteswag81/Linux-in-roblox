@@ -12,7 +12,9 @@
 		@screen <computer>            print that computer's screen
 		@expect <computer> <text>     fail unless the screen contains text
 		@reboot <computer>            power cycle (disk is kept)
-	Computers are created on first mention and booted automatically.
+		@usb <computer> in|out        plug in / pull out the installer flash drive
+	Computers are created on first mention (with the flash drive plugged in)
+	and booted automatically.
 ]]
 
 local fs = require("@lune/fs")
@@ -85,6 +87,7 @@ local function getComputer(name)
 		mac = mac,
 		disk = Disk.new(32 * 1024 * 1024),
 		loadImage = loadImage,
+		flashDrive = "BrickLinux",
 	})
 	local owner = { userId = userId, name = name }
 	computer.hostLinkHandler = function(command, args, payload, reply)
@@ -221,6 +224,10 @@ for _, line in lines do
 		disk:readInto(0, 512, mbr, 0)
 		print(string.format("[disk %s] %d blocks used, generation %d, MBR signature %02x%02x",
 			rest, disk:usedBlocks(), disk.generation, buffer.readu8(mbr, 510), buffer.readu8(mbr, 511)))
+	elseif cmd == "usb" then
+		local who, how = string.match(rest, "^(%S+)%s+(%S+)$")
+		getComputer(who).computer:setFlashDrive(if how == "in" then "BrickLinux" else nil)
+		runAll(0.5)
 	elseif cmd == "reboot" then
 		local c = getComputer(rest)
 		c.computer:pressPower(os.clock())

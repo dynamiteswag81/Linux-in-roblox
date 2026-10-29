@@ -33,11 +33,14 @@ step "Configuring the installed system"
 cat > "$target/etc/inittab" <<'EOT'
 # /etc/inittab for an installed Brick Linux system (busybox init)
 ::sysinit:/etc/init.d/rcS
-console::respawn:/sbin/getty -L 0 console vt102
+ttyS0::respawn:/sbin/getty -L 0 ttyS0 vt102
 ::ctrlaltdel:/sbin/reboot
 ::shutdown:/etc/init.d/rcK
 EOT
 hostname > "$target/etc/hostname"
+# Buildroot locks root ("*"). Until the player sets a password, root logs in
+# with an empty one, so skipping that step can't lock them out of their disk.
+sed -i 's/^root:[^:]*:/root::/' "$target/etc/shadow"
 cat > "$target/etc/motd" <<'EOT'
 
 Welcome to Brick Linux!  Get software from the Community Workshop:
@@ -51,4 +54,4 @@ if [ $# -gt 0 ]; then
 fi
 
 sync
-step "Done. Set a root password with: brick-chroot $target passwd"
+step "Done. root has no password yet; set one with: brick-chroot $target passwd"

@@ -29,9 +29,15 @@ local Config = {
 	-- Seconds the firmware waits before booting the default entry.
 	BOOT_COUNTDOWN = 3,
 
-	-- Kernel images in ServerStorage.LinuxImages, in order of preference.
-	-- BrickLinux is built by CI from linux/; MiniLinux is the prebuilt fallback.
-	IMAGES = { "BrickLinux", "MiniLinux" },
+	-- Kernel image in ServerStorage.LinuxImages (built by CI from linux/). It
+	-- boots both the installed system and the live installer on the flash drive.
+	IMAGE = "BrickLinux",
+
+	-- The live installer only boots from the installer flash drive, which the
+	-- game plugs into a desk (desk attribute "FlashDrive", or
+	-- ComputerService.insertFlashDrive). Set to false to make it always
+	-- available, e.g. for testing in Studio before the flash drive exists.
+	REQUIRE_FLASH_DRIVE = true,
 
 	---------------------------------------------------------------------------
 	-- Screens and moderation

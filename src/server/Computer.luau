@@ -32,6 +32,8 @@ export type Options = {
 	disk: Disk.Disk,
 	-- Returns the kernel image with this name, or nil if the game doesn't have it.
 	loadImage: (name: string) -> buffer?,
+	-- Image on the flash drive in the USB port at power on, if any (see setFlashDrive).
+	flashDrive: string?,
 }
 
 export type Computer = typeof(setmetatable(
@@ -43,6 +45,7 @@ export type Computer = typeof(setmetatable(
 		mac: string?,
 		disk: Disk.Disk,
 		loadImage: (name: string) -> buffer?,
+		flashDrive: string?,
 		machine: Machine.Machine?,
 		terminal: Terminal.Terminal,
 		firmware: Firmware.Firmware?,
@@ -73,6 +76,7 @@ function Computer.new(options: Options): Computer
 		mac = options.mac,
 		disk = options.disk,
 		loadImage = options.loadImage,
+		flashDrive = options.flashDrive,
 		machine = nil,
 		terminal = Terminal.new(Config.COLS, Config.ROWS),
 		firmware = nil,
@@ -210,31 +214,73 @@ function Computer.receiveFrame(self: Computer, frame: string)
 	end
 end
 
+-- Plugs in (image name) or pulls out (nil) the installer flash drive. The live
+-- system runs from memory, so pulling it out only matters at the next boot.
+function Computer.setFlashDrive(self: Computer, image: string?)
+	if self.flashDrive == image then
+		return
+	end
+	self.flashDrive = image
+	-- A firmware waiting for something to boot notices the drive straight away.
+	local firmware = self.firmware
+	if self.state == "firmware" and firmware and firmware.mode == "nodevice" then
+		self:_startFirmware(os.clock())
+	end
+end
+
+-- The image the installer flash drive boots, or nil if there's no drive in.
+function Computer._usbImage(self: Computer): string?
+	if self.flashDrive then
+		return self.flashDrive
+	elseif not Config.REQUIRE_FLASH_DRIVE then
+		return Config.IMAGE
+	end
+	return nil
+end
+
+--[[
+	True if the disk looks like it holds an installed system: an MBR partition
+	table whose first partition has an ext2 filesystem (what the install guide
+	creates). Whether the system on it is complete is up to the guest's /init.
+]]
+function Computer.hasInstalledSystem(self: Computer): boolean
+	local disk = self.disk
+	local mbr = buffer.create(512)
+	disk:readInto(0, 512, mbr, 0)
+	if buffer.readu8(mbr, 510) ~= 0x55 or buffer.readu8(mbr, 511) ~= 0xAA then
+		return false
+	end
+	local partType = buffer.readu8(mbr, 446 + 4)
+	local startSector = buffer.readu32(mbr, 446 + 8)
+	if partType == 0 or startSector == 0 then
+		return false
+	end
+	local superblock = startSector * 512 + 1024
+	if superblock + 1024 > disk.size then
+		return false
+	end
+	local sb = buffer.create(64)
+	disk:readInto(superblock, 64, sb, 0)
+	return buffer.readu16(sb, 56) == 0xEF53
+end
+
+-- What the firmware can boot, in boot order: the disk, then the flash drive.
 function Computer._bootEntries(self: Computer): { Firmware.BootEntry }
 	local entries: { Firmware.BootEntry } = {}
-	local primary = Config.IMAGES[1]
-	local hasPrimary = self.loadImage(primary) ~= nil
-	if hasPrimary then
+	if self.loadImage(Config.IMAGE) and self:hasInstalledSystem() then
 		table.insert(entries, {
 			id = "disk",
-			label = Config.OS_NAME,
-			hint = "Starts the system installed on your disk, or the live installer if there isn't one.",
-		})
-		table.insert(entries, {
-			id = "live",
-			label = Config.OS_NAME .. " (live installer)",
-			hint = "Always starts the live environment. Your disk is left alone.",
+			label = "Disk 0: " .. Config.OS_NAME,
+			hint = "Starts the system installed on your disk.",
 		})
 	end
-	for i = 2, #Config.IMAGES do
-		local name = Config.IMAGES[i]
-		if self.loadImage(name) then
-			table.insert(entries, {
-				id = "image:" .. name,
-				label = name .. if hasPrimary then " (fallback)" else "",
-				hint = "A tiny prebuilt Linux without disk or network support.",
-			})
-		end
+	local usb = self:_usbImage()
+	if usb and self.loadImage(usb) then
+		table.insert(entries, {
+			id = "usb",
+			label = "USB: " .. Config.OS_NAME .. " installer",
+			hint = "Starts the live installer from the flash drive. Your disk is left alone until you install.",
+		})
 	end
 	return entries
 end
@@ -247,11 +293,7 @@ function Computer._startFirmware(self: Computer, now: number)
 	self.terminal:reset()
 	self.needsSnapshot = true
 	local entries = self:_bootEntries()
-	if #entries == 0 then
-		self:_emit("\27[2J\27[HNo operating system images were found.\r\n")
-		self:_setState("firmware")
-		return
-	end
+	local usb = self:_usbImage()
 	local firmware = Firmware.new(function(data)
 		self:_emit(data)
 	end, entries, {
@@ -262,9 +304,12 @@ function Computer._startFirmware(self: Computer, now: number)
 		ip = self.ip,
 		owner = self.ownerName,
 		hostname = self.hostname,
+		usb = if usb then Config.OS_NAME .. " installer flash drive" else nil,
 	}, function(entry)
 		self:_boot(entry)
-	end, Config.BOOT_COUNTDOWN)
+	end, Config.BOOT_COUNTDOWN, function()
+		self:_startFirmware(os.clock())
+	end)
 	self.firmware = firmware
 	self:_setState("firmware")
 	firmware:start(now)
@@ -291,15 +336,13 @@ end
 
 function Computer._boot(self: Computer, entry: Firmware.BootEntry)
 	self.firmware = nil
-	local imageName = Config.IMAGES[1]
-	local live = entry.id == "live"
-	local custom = string.match(entry.id, "^image:(.+)$")
-	if custom then
-		imageName = custom
-	end
-	local image = self.loadImage(imageName)
+	local live = entry.id == "usb"
+	local imageName = if live then self:_usbImage() else Config.IMAGE
+	local image = imageName and self.loadImage(imageName)
 	if not image then
-		self:_emit("\r\nBoot failed: image " .. imageName .. " is missing.\r\n")
+		-- The drive was pulled out during the countdown, or the image is missing.
+		self:_emit("\r\nBoot failed: " .. entry.label .. " is gone.\r\n")
+		self:_startFirmware(os.clock())
 		return
 	end
 	local machine = self:_getMachine()

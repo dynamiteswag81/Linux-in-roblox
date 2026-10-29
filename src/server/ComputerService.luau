@@ -7,6 +7,9 @@
 	  like web servers stay reachable for other players.
 	- Desks are Models tagged "LinuxComputer" (CollectionService) with a part
 	  named "Screen". Using a desk shows *your* computer on it. See docs/SETUP.md.
+	- The installer flash drive is the desk's "FlashDrive" attribute (true when
+	  plugged in), set by the game's own flash drive mechanic or through
+	  ComputerService.insertFlashDrive / ejectFlashDrive.
 	- Every frame the running computers share Config.FRAME_BUDGET of CPU time,
 	  and new console output is streamed to whoever is looking at the screen.
 ]]
@@ -338,6 +341,17 @@ local function findScreen(desk: Model): BasePart?
 	return desk.PrimaryPart
 end
 
+-- The image on the flash drive plugged into a desk, if any.
+local function deskFlashDrive(desk: Model): string?
+	local value = desk:GetAttribute("FlashDrive")
+	if value == true then
+		return Config.IMAGE
+	elseif type(value) == "string" and value ~= "" then
+		return value
+	end
+	return nil
+end
+
 local function leaveDesk(player: Player)
 	local session = sessions[player]
 	if not session or not session.desk then
@@ -345,6 +359,9 @@ local function leaveDesk(player: Player)
 	end
 	local desk = session.desk
 	session.desk = nil
+	if session.computer then
+		session.computer:setFlashDrive(nil)
+	end
 	if deskOwner[desk] == player then
 		deskOwner[desk] = nil
 		desk:SetAttribute("InUseBy", 0)
@@ -380,6 +397,7 @@ local function useDesk(player: Player, desk: Model)
 	end
 	deskOwner[desk] = player
 	session.desk = desk
+	computer:setFlashDrive(deskFlashDrive(desk))
 	desk:SetAttribute("InUseBy", player.UserId)
 	desk:SetAttribute("UserName", player.DisplayName)
 	desk:SetAttribute("ComputerId", computer.id)
@@ -413,6 +431,17 @@ local function setupDesk(desk: Instance)
 	desk:SetAttribute("UserName", "")
 	desk:SetAttribute("ComputerId", "")
 	desk:SetAttribute("ComputerState", "off")
+	if desk:GetAttribute("FlashDrive") == nil then
+		desk:SetAttribute("FlashDrive", false)
+	end
+	desk:GetAttributeChangedSignal("FlashDrive"):Connect(function()
+		local player = deskOwner[desk]
+		local session = player and sessions[player]
+		local computer = session and session.computer
+		if computer then
+			computer:setFlashDrive(deskFlashDrive(desk))
+		end
+	end)
 
 	local prompt = desk:FindFirstChild("UseComputerPrompt", true)
 	if not prompt then
@@ -614,6 +643,16 @@ local function onPlayerRemoving(player: Player)
 	sessions[player] = nil
 end
 
+-- Plugs the installer flash drive into a desk (for the game's flash drive item).
+function ComputerService.insertFlashDrive(desk: Model)
+	desk:SetAttribute("FlashDrive", true)
+end
+
+-- Pulls the flash drive out of a desk.
+function ComputerService.ejectFlashDrive(desk: Model)
+	desk:SetAttribute("FlashDrive", false)
+end
+
 function ComputerService.start()
 	for _, desk in CollectionService:GetTagged(DESK_TAG) do
 		setupDesk(desk)
@@ -647,11 +686,11 @@ function ComputerService.start()
 		workshop:flushDownloads()
 	end)
 
-	if not loadImage(Config.IMAGES[1]) then
+	if not loadImage(Config.IMAGE) then
 		warn(
 			"[Linux] Image "
-				.. Config.IMAGES[1]
-				.. " not found in ServerStorage.LinuxImages; computers will boot the fallback image."
+				.. Config.IMAGE
+				.. " not found in ServerStorage.LinuxImages; computers have nothing to boot."
 		)
 	end
 end

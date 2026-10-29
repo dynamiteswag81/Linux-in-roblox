@@ -2,7 +2,8 @@
 --[[
 	The computer's firmware ("BrickBIOS"): the screen you see between pressing
 	the power button and Linux starting. Shows a POST screen, counts down, and
-	offers a boot menu (live installer, fallback kernel...).
+	offers a boot menu (installed system, installer flash drive). With nothing
+	to boot it says so and waits for a key (or a flash drive) to look again.
 
 	Engine-agnostic: output goes through `write`, keys come in through
 	`input`, and `update` advances the countdown.
@@ -25,17 +26,20 @@ export type Info = {
 	ip: string?,
 	owner: string,
 	hostname: string,
+	-- What's in the USB port (the installer flash drive's label), if anything.
+	usb: string?,
 }
 
 export type Firmware = typeof(setmetatable(
 	{} :: {
 		write: (data: string) -> (),
 		onBoot: (entry: BootEntry) -> (),
+		onRetry: (() -> ())?,
 		entries: { BootEntry },
 		info: Info,
 		countdown: number,
 		deadline: number?,
-		mode: "post" | "menu" | "done",
+		mode: "post" | "menu" | "nodevice" | "done",
 		lastShown: number,
 		selected: number,
 		pendingInput: string,
@@ -57,12 +61,14 @@ function Firmware.new(
 	entries: { BootEntry },
 	info: Info,
 	onBoot: (entry: BootEntry) -> (),
-	countdown: number?
+	countdown: number?,
+	-- Called when there's nothing to boot and the player presses a key.
+	onRetry: (() -> ())?
 ): Firmware
-	assert(#entries > 0, "firmware needs at least one boot entry")
 	return setmetatable({
 		write = write,
 		onBoot = onBoot,
+		onRetry = onRetry,
 		entries = entries,
 		info = info,
 		countdown = countdown or 3,
@@ -102,11 +108,23 @@ function Firmware.start(self: Firmware, now: number)
 			info.diskMB,
 			if info.diskUsedKB > 0 then string.format("%dK in use", info.diskUsedKB) else "empty"
 		),
+		BOLD .. " USB     " .. RESET .. ": " .. (info.usb or "no device"),
 		BOLD .. " Network " .. RESET .. string.format(": virtio-net %s  %s", formatMac(info.mac), info.ip or "offline"),
 		BOLD .. " Owner   " .. RESET .. ": " .. info.owner .. "  (" .. info.hostname .. ")",
 		"",
 	}
 	self.write(table.concat(lines, "\r\n") .. "\r\n")
+	if #self.entries == 0 then
+		self.mode = "nodevice"
+		self.write(
+			BOLD
+				.. " No bootable device found."
+				.. RESET
+				.. "\r\n\r\n The disk has no operating system. Insert the installer flash drive,\r\n"
+				.. " then press any key to try again."
+		)
+		return
+	end
 	self.mode = "post"
 	self.deadline = now + self.countdown
 	self:_drawCountdown(self.countdown)
@@ -185,6 +203,13 @@ end
 
 function Firmware.input(self: Firmware, data: string)
 	if self.mode == "done" then
+		return
+	elseif self.mode == "nodevice" then
+		local retry = self.onRetry
+		if retry then
+			self.mode = "done"
+			retry()
+		end
 		return
 	end
 	self.pendingInput ..= data
