@@ -3,8 +3,8 @@ return {
 	name = "Brick Linux",
 	description = "Brick Linux kernel + live installer initramfs (built by CI from linux/).",
 	format = "lz4+base64",
-	size = 4112324,
-	compressedSize = 2426205,
-	sha256 = "91b803f39a5aa891a400df985d126f572a68944ac136716a1e9df6f7fe1dfd85",
+	size = 4122948,
+	compressedSize = 2432576,
+	sha256 = "ab4af2ead9528dcbfa92a15c1c259d9474820353ce7cb2aa5cd2841a68e1dd12",
 	chunks = 17,
 }
