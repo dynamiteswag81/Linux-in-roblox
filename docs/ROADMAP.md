@@ -7,19 +7,18 @@ Living document: what works, what's next. Each work session updates it.
 - **One player per server.** Each server runs exactly one person's computer.
   Consequences:
   - The in-game internet can't stay inside one server: other players' computers
-    are on other servers. It needs a cross-server relay (MessagingService for
-    frames/messages, MemoryStore for the directory of online computers and
-    globally unique addresses). Budget: about 840 messages/min of up to 1 KB
-    per one-player server, with up to about 1 s of latency. That's enough for
-    ping, `msg`, `talk` and small web pages, not for bulk transfers.
+    are on other servers. Done: a cross-server relay (MessagingService for packets
+    and messages, MemoryStore for the directory; each server gives other servers'
+    computers local 10.1.x.y addresses, so no global address allocation). Budget:
+    about 840 messages/min of up to 1 KB per one-player server, with up to about
+    1 s of latency. That's enough for ping, `msg`, `talk` and small web pages, not
+    for bulk transfers.
   - Offline players' computers aren't running, so their websites are down while
-    they're away (an optional "hosted pages" feature could serve a published
-    copy).
-  - `msg` must reach other servers (MessagingService), plus a DataStore inbox
-    for players who are offline.
-  - The whole server CPU belongs to one VM: raise the per-frame budget
-    (`Config.FRAME_BUDGET` / `MAX_COMPUTER_BUDGET`) and consider running it in an
-    Actor.
+    they're away (the "web hosting" idea below could serve a published copy).
+  - `msg` reaches other servers (done); a DataStore inbox for players who are
+    offline is still to do.
+  - The whole server CPU belongs to one VM: `MAX_COMPUTER_BUDGET` is now 10 ms per
+    frame. Running it in an Actor is still an option.
   - Showing your screen to other players (docs/MODERATION.md item 1) no longer
     applies.
   - The flash drive, desks and the Workshop are unaffected.
@@ -62,76 +61,65 @@ Workshop publishing slots, cosmetic desks and monitors.
 - **Devices:** console UART (interrupt-driven), PLIC, virtio disk (`/dev/vda`, ext2),
   virtio network (`eth0`), host link mailbox, syscon power off/reboot, runtime
   device tree.
-- **Brick Linux** (built by CI from `linux/`): live installer with busybox (vi, less,
-  awk, tar, fdisk, mkfs.ext2, wget, nc, httpd...), `brick` package manager,
-  `brickstrap`/`brick-chroot`/`genfstab`, `install-guide`, `msg`.
-  Guest bugs found and fixed: uClibc riscv32 64-bit syscall arguments (vi saved
-  empty files), busybox's 4 KB stack (any `$(a | b)` crashed the shell), `/init`
-  PATH, brickstrap ordering.
+- **Brick Linux** (built by CI from `linux/`, the only image; the copied prebuilt
+  MiniLinux is gone): live installer with busybox (vi, less, awk, tar, fdisk,
+  mkfs.ext2, wget, nc, httpd...), `brick` package manager,
+  `brickstrap`/`brick-chroot`/`genfstab`, `install-guide`, `msg`. Guest bugs found
+  and fixed (patches in `linux/patches`): uClibc riscv32 64-bit syscall arguments
+  (vi saved empty files), busybox's 4 KB stack, hush `$(...)` crashing in every
+  login shell, httpd 404 on `/`, Ctrl-C and job control not working (login on
+  `/dev/console`), installed root locked by buildroot.
+- **Installer flash drive:** desk attribute `FlashDrive` /
+  `ComputerService.insertFlashDrive`. The firmware boots the disk if it has a
+  system, else the flash drive, else shows "No bootable device".
 - **Terminal emulator** (VT100/xterm subset) with exact snapshots for late joiners and
   flood protection.
 - **Firmware** (BrickBIOS) with POST screen and boot menu.
 - **Server:** per-player computers, desks, CPU budgeting, streaming, disk saving
-  (DataStore, two-slot), Community Workshop (publish/search/install, filtering,
-  ownership, quotas), 12 official starter packages (incl. `snake`, `cowsay`,
-  `webserver`, `browse`), in-game network (switch + gateway with ARP/ping/DNS),
-  the **Workshop website** at `http://workshop/` (TCP + HTTP in Luau), filtered
-  player messaging (`msg`).
+  (DataStore, two-slot), Community Workshop (publish/search/install/unpublish,
+  filtering, ownership, quotas), 13 official starter packages, the **Workshop
+  website** at `http://workshop/` (TCP + HTTP in Luau), filtered player messaging
+  (`msg`).
+- **Cross-server internet:** other servers' computers appear at 10.1.x.y; packets
+  are batched into MessagingService messages with NAT and MSS clamping; a
+  MemoryStore directory backs DNS and `net.who`; `msg` crosses servers.
 - **Client:** desk screens, focus mode with keyboard capture, on-screen keyboard
   (Esc, F-keys...), physical `Key_*` parts, zoom view, Workshop browser.
 - **Roblox simulation** (`tools/lune/sim.luau`): the real server and client scripts
-  run against reflection-validated instances: prompt → boot → typing → workshop →
-  leave, no errors.
-- End-to-end scenarios (`tests/scenarios`): packages, two computers pinging and
-  fetching web pages from each other by name, vi editing, fdisk/mkfs/brickstrap
-  install and booting the installed system, the workshop website.
+  run against reflection-validated instances: prompt → no bootable device → flash
+  drive in → boot → typing → workshop → leave, no errors.
+- **End-to-end scenarios** (`tests/scenarios`, one simulated server per computer):
+  packages, ping/web pages/`msg`/DNS between computers in different servers, vi,
+  the full Arch-style install then booting and logging into it, the games, the
+  workshop website.
 
 ### Not yet verified in Roblox Studio
 
 Nobody has pressed Play in Studio yet. The simulation catches API misuse, but expect
-small fixes on first run (see the checklist in docs/SETUP.md).
+small fixes on first run (see the checklist in docs/SETUP.md). The cross-server
+network can only be exercised in live servers.
 
 ## Next up (in order)
 
-1. **Verify CI image #5**: busybox patches for the hush `$(...)` crash (re-executed
-   subshells became login shells and freed `-F` function names) and httpd 404 on
-   `/` (CGI without basic auth); `/init` no longer falls back to the live system
-   when booted from disk (the installer needs the flash drive). Rerun all
-   `tests/scenarios/*.txt` and measure idle cost with `lune run tools/lune/idle.luau`.
-2. **Flash drive (server side).** The owner's game inserts the installer drive;
-   we provide the hook: a `FlashDrive` attribute on the desk plus
-   `ComputerService.insertFlashDrive(desk)` / `ejectFlashDrive(desk)`. Firmware boot
-   order: the disk if it holds a system (MBR + ext2 on partition 1), else the flash
-   drive (live installer, `brick.live=1`), else a "No bootable device, insert the
-   installer flash drive" screen that retries when a drive goes in.
-   `Config.REQUIRE_FLASH_DRIVE` (off for Studio testing without the mechanic).
-   Document it in docs/SETUP.md. (Guest side is done: `/init` no longer falls
-   back to the live system when booted from disk.)
-3. **Cross-server internet** (see Design constraints): relay network frames and
-   `msg` between servers, a directory of online computers (`net.who`, DNS), unique
-   addresses, and a bigger CPU budget for the single VM.
-4. **Built from scratch:** remove the copied prebuilt `src/images/MiniLinux` image
-   and its fallback boot entry; README section on what is written for this
-   project (emulator, devices, terminal, firmware, OS integration, packages) vs.
-   upstream sources we compile (Linux, busybox, uClibc via buildroot).
-5. **Monitor for desktop environments:** `simple-framebuffer` in guest RAM
-   (kernel `CONFIG_FB_SIMPLE`), virtio-input for keyboard + mouse (`evdev`), a guest
-   drawing tool so shell scripts can draw, server-side dirty-tile streaming, client
-   rendering on the desk's monitor with EditableImage.
-6. **Docs:** player guide (installing, packages, network), package authoring guide,
-   flash-drive integration guide for the owner; confirm disk saving across visits
-   (DiskStore, autosave, save on leave/shutdown) and document it.
-7. **Studio smoke test** with the owner, and fixes from it.
-8. **Speed / scale:** run VMs in Actors for multi-core servers; an instruction decode
-   cache for 2x interpreted speed (for client-side VMs).
-9. **Snapshots:** save a booted machine's RAM so power-on can resume instantly,
-   and suspend computers whose owner hasn't touched them for a while.
-10. **Installer polish:** password prompt on first boot of an installed system,
-    progress output in `brick`.
-11. **Workshop:** likes/ratings, "my packages" view, unpublish from the GUI, package
-    screenshots (text previews).
-12. **More software:** an `edit` text editor that's friendlier than vi, games
-    (2048, tetris), a `man`-style help system.
+1. **Monitor for desktop environments:** `simple-framebuffer` in guest RAM
+   (kernel `CONFIG_FB` + `CONFIG_FB_SIMPLE`), virtio-input for keyboard + mouse
+   (`CONFIG_VIRTIO_INPUT`, `CONFIG_INPUT_EVDEV`), a display-mode switch (terminal vs
+   graphics), guest tools so shell scripts can draw (`brickdraw`) and read input
+   (`brickinput`), server-side dirty-tile streaming (LZ4), client rendering with
+   EditableImage and mouse capture on the monitor.
+2. **Auto install** (paid, in-game GUI button): `ComputerService.autoInstall(player)`
+   writes a ready-made system to the disk; the owner wires the button and the pass.
+3. **Studio smoke test** with the owner, and fixes from it.
+4. **Offline messages:** a DataStore inbox for `msg` to players who aren't online.
+5. **Speed / scale:** run the VM in an Actor; an instruction decode cache for 2x
+   interpreted speed.
+6. **Snapshots:** save a booted machine's RAM so power-on can resume instantly.
+7. **Installer polish:** password prompt on first boot of an installed system,
+   progress output in `brick`.
+8. **Workshop:** likes/ratings, "my packages" view, unpublish from the GUI, package
+   screenshots (text previews).
+9. **More software:** an `edit` text editor that's friendlier than vi, games
+   (2048, tetris), a `man`-style help system.
 
 ## Decisions waiting on the owner
 

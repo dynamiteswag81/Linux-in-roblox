@@ -13,9 +13,13 @@ places. Here is what the game does today, and the choices that are yours to make
   than storing unfiltered text.
 
 - **Messages between players** sent with `msg <user> <text>` inside the computer go
-  through the game server and are filtered per recipient like private chat
-  (`TextService:FilterStringAsync(..., PrivateChat):GetChatForUserAsync`). If filtering
-  fails, the message isn't delivered. This is the recommended way for players to talk.
+  through the game servers and are filtered before they're sent
+  (`TextService:FilterStringAsync(..., PrivateChat)`). With one player per server the
+  recipient is almost always in another server, where per-recipient filtering isn't
+  available, so those messages get the strictest level
+  (`GetNonChatStringForBroadcastAsync`); recipients in the same server get
+  `GetChatForUserAsync`. If filtering fails, the message isn't delivered. This is the
+  recommended way for players to talk.
 
 ## What isn't filtered (decisions for you)
 

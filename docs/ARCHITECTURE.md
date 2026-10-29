@@ -53,7 +53,27 @@ switches to an installed system on `/dev/vda1` if there is one. Brick Linux's ow
 | `DiskStore` | Disks in a DataStore: compressed, base64, chunked under 4 MB, two alternating slots so a failed save never corrupts the last good one. |
 | `WorkshopService` | Packages: publish (validation, ownership, quota, TextService filtering), search, details, download. `OfficialPackages` are built in. |
 | `HostLinkCommands` | What `hostlink` can ask for: `pkg.*` (workshop), `net.*` (who's online), `sys.*`. |
-| `NetworkService` + `Net/Packet` | Ethernet switch between computers; gateway 10.0.0.1 answers ARP, ICMP echo, DNS (player names), and resets TCP. |
+| `NetworkService` + `Net/Packet` | Ethernet switch between this server's computers; gateway 10.0.0.1 answers ARP, ICMP echo, DNS (player names), serves the Workshop website over TCP, and relays traffic to computers in other servers (below). |
+| `Net/CrossServer` | Links the servers: a MessagingService topic per player carries relayed packets and `msg` messages; a MemoryStore sorted map is the directory of online computers. |
+
+### The network across servers
+
+Each game server has one player, so every other computer is in another server. In
+each server, other servers' computers get local addresses in **10.1.0.0/16**, behind
+the gateway (the guest's default route). When a guest sends to one of those addresses:
+
+1. the gateway queues the IP packet for that player's server, and every 50 ms packs
+   queued packets (base64) into messages under MessagingService's 1 KB limit, at most
+   `Config.RELAY_MESSAGES_PER_SECOND` per second;
+2. the receiving server translates the addresses (the sender's 10.1.x.y alias there,
+   and its own computer's 10.0.0.x) and fixes the IP/TCP/UDP checksums. TCP SYNs get
+   their MSS clamped to 600 bytes so segments always fit a message;
+3. its computer gets an ordinary Ethernet frame from the gateway.
+
+DNS asks the directory when a name isn't local (in a spawned thread, so the VM keeps
+running). Expect up to a second of latency and roughly 6 KB/s: fine for ping, `msg`,
+`talk` and web pages, not for big downloads. Same-server traffic (e.g. several test
+players in Studio) still goes straight through the local switch.
 
 ## Client (`src/client`)
 

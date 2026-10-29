@@ -20,9 +20,12 @@ local Config = {
 	ROWS = 25,
 
 	-- Server CPU time (seconds) all running computers may use per frame, and the
-	-- most a single computer may take. Idle computers cost almost nothing.
+	-- most a single computer may take. Idle computers cost almost nothing. With
+	-- one player per server there's one computer, so it gets most of a frame
+	-- (about 18 MIPS with native code generation); keep some room for the rest
+	-- of the game.
 	FRAME_BUDGET = 0.010,
-	MAX_COMPUTER_BUDGET = 0.008,
+	MAX_COMPUTER_BUDGET = 0.010,
 	-- Guest microseconds that pass per executed instruction while busy (see Machine).
 	US_PER_INSTRUCTION = 0.25,
 

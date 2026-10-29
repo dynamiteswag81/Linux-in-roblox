@@ -50,7 +50,7 @@ local machine = Machine.new({
 	ramSize = opts.ram * 1024 * 1024,
 	disk = Disk.new(32 * 1024 * 1024),
 	mac = "\x02\x00\x0a\x00\x00\x02",
-	cmdline = "earlycon=uart8250,mmio,0x10000000,1000000 console=ttyS0 brick.ip=10.0.0.2 brick.hostname=tester brick.root=/dev/vda1",
+	cmdline = "earlycon=uart8250,mmio,0x10000000,1000000 console=ttyS0 brick.live=1 brick.ip=10.0.0.2 brick.hostname=tester brick.root=/dev/vda1",
 })
 machine:boot(buffer.fromstring(fs.readFile(imagePath)))
 

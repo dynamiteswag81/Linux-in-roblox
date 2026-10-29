@@ -12,8 +12,8 @@ installed system is saved with your account.
   everyone's in the Workshop GUI, install them with `brick install`.
 - **In-game internet:** players' computers and the Community Workshop are networked.
   `ping alice`, host a website with the `webserver` package, `browse bob`, `talk`
-  to each other. (Each server has one player; the cross-server relay is next on the
-  roadmap.)
+  to each other. Each server has one player; traffic to other players' computers is
+  relayed between servers.
 - **A physical desk:** the terminal is drawn on a screen part in the world. Your
   keyboard types into it, and keys Roblox keeps for itself (like Esc) are on an
   on-screen keyboard or clickable keyboard parts.

@@ -28,6 +28,12 @@ Disks (players' installed systems) and the Community Workshop are saved in DataS
 Without DataStores everything still runs, but nothing is saved: you'll see a warning in
 the output, and players get a "saving is unavailable" notice.
 
+The game is designed for **one player per server** (*Game Settings → Places → Max
+Players: 1*). Computers in other servers are reached through **MessagingService** and
+a **MemoryStore** directory, which also need API access in Studio. Several test
+players in one Studio server talk through the local network directly, so the
+cross-server path only runs in live servers.
+
 **How disks are saved:** each player's disk is loaded when they join and saved to
 `Config.DISK_DATASTORE` every `AUTOSAVE_INTERVAL` (2 min) if it changed, about 20 s
 after the guest flushes writes (`sync`), when the computer turns off, when the player
@@ -150,7 +156,7 @@ If something fails, the Output window's first error is the most useful thing to 
 ## Performance notes
 
 - Each server has one player, so one running computer. A busy computer takes up to
-  `Config.MAX_COMPUTER_BUDGET` (8 ms) of server time per frame (`FRAME_BUDGET` caps
+  `Config.MAX_COMPUTER_BUDGET` (10 ms) of server time per frame (`FRAME_BUDGET` caps
   them all together). Raising it makes the computer faster.
 - An idle computer costs ~1–2% of a core (less with the tickless kernel).
 - Each running computer holds `Config.RAM_MB` (32 MB) of server memory.

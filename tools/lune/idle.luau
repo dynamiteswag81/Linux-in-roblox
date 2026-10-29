@@ -19,7 +19,7 @@ end
 local m = Machine.new({
 	disk = Disk.new(32 * 1024 * 1024),
 	mac = "\2\0\10\0\0\2",
-	cmdline = "console=ttyS0 brick.hostname=idle brick.ip=10.0.0.2 brick.rows=25 brick.cols=80",
+	cmdline = "console=ttyS0 brick.live=1 brick.hostname=idle brick.ip=10.0.0.2 brick.rows=25 brick.cols=80",
 })
 m:boot(ImageLoader.fromChunks(info, chunks))
 local out = ""

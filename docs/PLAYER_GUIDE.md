@@ -85,8 +85,11 @@ msg alice hi there          # message a player (filtered like chat); `msg` reads
 
 Busybox network tools are all there: `wget`, `nc`, `telnet`, `httpd`, `ifconfig`, `ip`.
 
-(Each game server has one player, so reaching other players' computers goes across
-servers. That relay is being built; see docs/ROADMAP.md.)
+Each game server has one player, so other players' computers are in other servers.
+They're still reachable by name (their addresses look like `10.1.x.y` from your
+computer), but the link is slower than a real network: up to about a second of
+delay and a few KB per second. Big downloads from other players will crawl. Computers
+are only online while their owner is playing.
 
 ## Handy things
 

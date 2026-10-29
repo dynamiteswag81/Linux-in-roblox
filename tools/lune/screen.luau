@@ -17,7 +17,7 @@ local Terminal = Shim.require(root.Terminal.Terminal)
 local machine = Machine.new({
 	disk = Disk.new(32 * 1024 * 1024),
 	mac = "\x02\x00\x0a\x00\x00\x02",
-	cmdline = "console=ttyS0 brick.ip=10.0.0.2 brick.hostname=tester brick.root=/dev/vda1 brick.time=1793254000",
+	cmdline = "console=ttyS0 brick.live=1 brick.ip=10.0.0.2 brick.hostname=tester brick.root=/dev/vda1 brick.time=1793254000",
 })
 local term = Terminal.new(80, 25)
 term.onResponse = function(data)
