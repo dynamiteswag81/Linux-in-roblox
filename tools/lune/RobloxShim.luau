@@ -25,7 +25,7 @@ type Node = {
 	_path: string?, -- source file, if this is a script
 	_dir: string?, -- directory, if it has children
 	_children: { [string]: Node }?,
-	_options: { native: boolean },
+	_options: { native: boolean, inject: { [string]: any }? },
 }
 
 local nodeMeta = {}
@@ -134,10 +134,20 @@ local function requireNode(node: Node): any
 	-- A custom environment table would disable Luau's builtin fastcalls (16x
 	-- slower), so `script` and `require` are passed in as chunk arguments,
 	-- declared on the first line after the `--!` directives to keep line numbers.
+	-- Extra locals (Roblox globals like game, Enum, Instance) when a mount asks for them.
+	local inject = node._options.inject
+	local names, values = {}, {}
+	if inject then
+		for name, value in inject do
+			table.insert(names, name)
+			table.insert(values, value)
+		end
+	end
+	local header = "local script, require" .. (if #names > 0 then ", " .. table.concat(names, ", ") else "") .. " = ...; "
 	local lines = string.split(source, "\n")
 	for i, line in lines do
 		if string.sub(line, 1, 3) ~= "--!" then
-			lines[i] = "local script, require = ...; " .. line
+			lines[i] = header .. line
 			break
 		end
 	end
@@ -146,7 +156,7 @@ local function requireNode(node: Node): any
 		debugName = node._path,
 		codegenEnabled = node._options.native,
 	})
-	local result = chunk(node, Shim.require)
+	local result = chunk(node, Shim.require, table.unpack(values))
 	moduleCache[node] = result
 	return result
 end
@@ -159,7 +169,7 @@ function Shim.require(target: any): any
 end
 
 -- Mounts a directory as a fake Instance tree and returns the root node.
-function Shim.mount(dir: string, name: string, options: { native: boolean }?): any
+function Shim.mount(dir: string, name: string, options: { native: boolean, inject: { [string]: any }? }?): any
 	local root = setmetatable({
 		Name = name,
 		Parent = nil,
@@ -173,7 +183,7 @@ end
 
 -- Mounts several directories as siblings under one root folder, like the
 -- game's tree (e.g. { LinuxVM = "src/shared", LinuxServer = "src/server" }).
-function Shim.mountMany(dirs: { [string]: string }, options: { native: boolean }?): any
+function Shim.mountMany(dirs: { [string]: string }, options: { native: boolean, inject: { [string]: any }? }?): any
 	local opts = options or { native = true }
 	local root = setmetatable({
 		Name = "game",

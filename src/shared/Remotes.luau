@@ -4,7 +4,7 @@
 	first use; clients wait for them.
 
 		TerminalOutput  server -> client  (computerId, kind, payload)
-		                kind "data": raw console bytes
+		                kind "data": raw console bytes (a buffer)
 		                kind "snapshot": full Terminal snapshot
 		                kind "state": computer state ("off" | "firmware" | "running")
 		TerminalInput   client -> server  (bytes) keyboard input for the computer you're using

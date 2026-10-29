@@ -509,7 +509,7 @@ function ComputerController.start()
 	terminalOutput.OnClientEvent:Connect(function(computerId: string, kind: string, payload: any)
 		local term = getTerminal(computerId)
 		if kind == "data" then
-			term:write(payload)
+			term:write(if typeof(payload) == "buffer" then buffer.tostring(payload) else payload)
 		elseif kind == "snapshot" then
 			term:loadSnapshot(payload)
 		elseif kind == "state" then

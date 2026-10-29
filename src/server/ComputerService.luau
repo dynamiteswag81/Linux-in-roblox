@@ -547,8 +547,10 @@ local function step()
 		if computer then
 			local item = computer:takeStream(now)
 			if item then
+				-- Console output can be any bytes (not valid UTF-8), so send it as a buffer.
+				local payload = if item.kind == "data" then buffer.fromstring(item.payload) else item.payload
 				for _, p in viewersOf(session) do
-					terminalOutput:FireClient(p, computer.id, item.kind, item.payload)
+					terminalOutput:FireClient(p, computer.id, item.kind, payload)
 				end
 			end
 		end
