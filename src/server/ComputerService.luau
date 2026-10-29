@@ -409,6 +409,16 @@ local function setupDesk(desk: Instance)
 		useDesk(player, desk)
 	end)
 
+	-- Optional physical keyboard: parts named Key_<KeyCode name> become clickable
+	-- (the client turns clicks into key presses for whoever is using the desk).
+	for _, part in desk:GetDescendants() do
+		if part:IsA("BasePart") and string.match(part.Name, "^Key_.+") and not part:FindFirstChildOfClass("ClickDetector") then
+			local detector = Instance.new("ClickDetector")
+			detector.MaxActivationDistance = 12
+			detector.Parent = part
+		end
+	end
+
 	-- Optional physical power button with a ClickDetector.
 	local powerButton = desk:FindFirstChild("PowerButton", true)
 	if powerButton and powerButton:IsA("BasePart") then

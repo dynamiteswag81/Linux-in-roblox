@@ -30,7 +30,7 @@ fi
 # Our configs, overlay and helper sources live at <buildroot>/brick.
 rm -rf "$WORK/brick"
 mkdir -p "$WORK/brick"
-cp -a "$HERE/configs" "$HERE/overlay" "$HERE/src" "$HERE/post-build.sh" "$WORK/brick/"
+cp -a "$HERE/configs" "$HERE/overlay" "$HERE/src" "$HERE/patches" "$HERE/post-build.sh" "$WORK/brick/"
 
 cat "$HERE/configs/base/buildroot.config" "$HERE/configs/buildroot.fragment" > "$WORK/.config"
 make -C "$WORK" olddefconfig >/dev/null

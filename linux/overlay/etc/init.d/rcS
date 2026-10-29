@@ -27,6 +27,14 @@ for arg in $(cat /proc/cmdline); do
 done
 
 [ -n "$now" ] && date -s "@$now" >/dev/null 2>&1
+
+# Boot messages were shown; from here on only warnings and errors reach the screen.
+dmesg -n 4 2>/dev/null
+
+# Write changes to disk within a few seconds (the game saves the disk image;
+# data still sitting in the page cache would be lost if the player leaves).
+echo 300 > /proc/sys/vm/dirty_expire_centisecs 2>/dev/null
+echo 100 > /proc/sys/vm/dirty_writeback_centisecs 2>/dev/null
 stty -F /dev/console rows "$rows" cols "$cols" 2>/dev/null
 
 # The live system is named after its owner; installed systems use /etc/hostname.

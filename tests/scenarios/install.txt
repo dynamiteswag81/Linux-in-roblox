@@ -1,0 +1,24 @@
+# The Arch-style install: partition, format, mount, brickstrap, reboot into it.
+alice: fdisk -l /dev/vda
+@expect alice Disk /dev/vda
+alice: !keys fdisk /dev/vda\r
+alice: !keys o\r
+alice: !keys n\r
+alice: !keys p\r
+alice: !keys 1\r
+alice: !keys \r
+alice: !keys \r
+alice: !keys w\r
+@wait 3
+@screen alice
+alice: cat /proc/partitions
+@expect alice vda1
+alice: mkfs.ext2 /dev/vda1
+alice: mount /dev/vda1 /mnt && df -h /mnt
+@expect alice /mnt
+alice: brickstrap /mnt
+@expect alice Done.
+alice: echo mybox > /mnt/etc/hostname; sync; umount /mnt
+@reboot alice
+@wait 15
+@screen alice

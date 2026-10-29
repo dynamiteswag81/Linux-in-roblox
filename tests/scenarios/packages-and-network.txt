@@ -1,0 +1,22 @@
+# Package manager against the workshop, and two computers talking.
+alice: brick search cow
+@expect alice workshop/cowsay
+alice: brick install cowsay fortune
+@expect alice Installing fortune
+alice: fortune | cowsay
+@expect alice (oo)
+alice: brick list
+@expect alice cowsay 1.0
+alice: brick info hello
+@expect alice Description
+bob: hostlink net.who
+@expect bob alice
+bob: ping -c 2 alice
+@expect bob 2 packets received
+bob: ping -c 1 gateway
+@expect bob 1 packets received
+alice: brick install webserver browse
+@expect alice serving /www
+bob: brick install browse
+bob: wget -q -O - http://alice/ | head -5
+@expect bob Welcome to my computer

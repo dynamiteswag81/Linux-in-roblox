@@ -1,0 +1,11 @@
+# vi: open a file, append text, save and quit (Esc comes from the on-screen keyboard in-game).
+alice: echo 'hello vi' > /tmp/t.txt
+alice: !keys vi /tmp/t.txt\r
+@wait 2
+alice: !keys A
+alice: !keys  world
+alice: !keys \e
+alice: !keys :wq\r
+@wait 2
+alice: cat /tmp/t.txt
+@expect alice hello vi world

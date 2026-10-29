@@ -4,15 +4,12 @@ export PAGER=less
 export EDITOR=vi
 export HOME="${HOME:-/root}"
 
-if [ "$(id -u)" = "0" ]; then
-	export PS1='\[\e[1;31m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]# '
-else
-	export PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]$ '
-fi
+# \$ shows # for root and $ for everyone else.
+export PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
 
-alias ls='ls --color=auto'
-alias ll='ls -la'
-alias la='ls -A'
+# hush has no aliases; functions do the job (ls is colored by default).
+ll() { ls -la "$@"; }
+la() { ls -A "$@"; }
 
 for f in /etc/profile.d/*.sh; do
 	[ -r "$f" ] && . "$f"

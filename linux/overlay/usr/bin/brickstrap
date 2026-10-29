@@ -11,21 +11,23 @@ target="${1%/}"
 shift
 grep -q " $target " /proc/mounts || echo "warning: $target is not a mount point; files will not be saved to disk"
 
-step "Creating install root at $target"
-mkdir -p "$target/dev" "$target/proc" "$target/sys" "$target/tmp" "$target/run" \
-	"$target/root" "$target/home" "$target/mnt" "$target/var/log" "$target/var/tmp"
-chmod 1777 "$target/tmp" "$target/var/tmp"
-chmod 0700 "$target/root"
-
 step "Installing the base system"
 for d in bin sbin usr etc lib var; do
-	[ -d "/$d" ] || continue
+	[ -e "/$d" ] || continue
+	if [ -e "$target/$d" ] || [ -L "$target/$d" ]; then
+		rm -rf "$target/$d"
+	fi
 	printf '  copying /%s\n' "$d"
 	cp -a "/$d" "$target/" || die "copy of /$d failed (disk full?)"
 done
 rm -f "$target/etc/brick/live" "$target/etc/brick/live-motd"
-rm -rf "$target/var/run" "$target/var/tmp"/* 2>/dev/null
-ln -sf /run "$target/var/run"
+
+step "Creating the root filesystem layout"
+for d in dev proc sys tmp run root home mnt; do
+	[ -e "$target/$d" ] || mkdir -p "$target/$d"
+done
+chmod 1777 "$target/tmp"
+chmod 0700 "$target/root"
 
 step "Configuring the installed system"
 cat > "$target/etc/inittab" <<'EOT'

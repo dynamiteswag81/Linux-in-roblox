@@ -1,0 +1,19 @@
+# Install by hand (what a fixed brickstrap does) and boot into the installed system.
+alice: !keys fdisk /dev/vda\r
+alice: !keys o\r
+alice: !keys n\r
+alice: !keys p\r
+alice: !keys 1\r
+alice: !keys \r
+alice: !keys \r
+alice: !keys w\r
+@wait 3
+alice: mkfs.ext2 -q /dev/vda1 && mount /dev/vda1 /mnt
+alice: cp -a /bin /sbin /usr /etc /lib /var /mnt/ && mkdir -p /mnt/dev /mnt/proc /mnt/sys /mnt/tmp /mnt/run /mnt/root /mnt/home && rm /mnt/etc/brick/live && echo mybox > /mnt/etc/hostname && du -sh /mnt
+alice: sed -i 's|^console::respawn.*|console::respawn:/sbin/getty -L 0 console vt102|' /mnt/etc/inittab && sync && umount /mnt && echo UNMOUNTED
+@expect alice UNMOUNTED
+@reboot alice
+@wait 5
+
+alice: cat /proc/cmdline; ls -la /dev/vda*; mount /dev/vda1 /mnt; ls -la /mnt/sbin/init /mnt/etc/brick; umount /mnt
+@screen alice

@@ -2,9 +2,11 @@
 # brick - the Brick Linux package manager.
 #
 # Packages live in the Community Workshop and are fetched through the host link.
-# A package is a .tar.gz containing:
-#     BRICK     manifest: name=, version=, description=, depends= (one per line)
-#     files/    everything under here is installed relative to /
+# A package is a tar archive containing:
+#     BRICK       manifest: name=, version=, description=, depends= (one per line)
+#     files/      everything under here is installed relative to /
+#     README      optional, shown in the Workshop
+#     install.sh  optional, runs after installing
 #
 # Set BRICK_ROOT to install into another root (brickstrap uses this).
 
@@ -58,12 +60,12 @@ install_one() { # <pkg> [reinstall]
 	fi
 	tmp="$(mktemp -d /tmp/brick.XXXXXX)" || die "cannot create temp dir"
 	info "Downloading $pkg..."
-	if ! hostlink pkg.get "$pkg" > "$tmp/pkg.tgz"; then
+	if ! hostlink pkg.get "$pkg" > "$tmp/pkg.tar"; then
 		rm -rf "$tmp"
 		die "could not download $pkg"
 	fi
 	mkdir -p "$tmp/x"
-	if ! tar -xzf "$tmp/pkg.tgz" -C "$tmp/x"; then
+	if ! tar -xf "$tmp/pkg.tar" -C "$tmp/x"; then
 		rm -rf "$tmp"
 		die "$pkg: package archive is damaged"
 	fi
@@ -169,7 +171,11 @@ do_publish() {
 	[ -n "$name" ] || die "publish: BRICK needs a name= line"
 	info "Packing $name $(manifest_get "$dir/BRICK" version)..."
 	tmp="$(mktemp /tmp/brick.XXXXXX)" || die "cannot create temp file"
-	(cd "$dir" && tar -czf "$tmp" BRICK $( [ -d files ] && echo files ) $( [ -f install.sh ] && echo install.sh )) \
+	parts="BRICK"
+	for extra in files install.sh README README.md README.txt; do
+		[ -e "$dir/$extra" ] && parts="$parts $extra"
+	done
+	(cd "$dir" && tar -cf "$tmp" $parts) \
 		|| { rm -f "$tmp"; die "could not pack $dir"; }
 	info "Uploading to the Community Workshop..."
 	hostlink -i "$tmp" pkg.publish "$name"

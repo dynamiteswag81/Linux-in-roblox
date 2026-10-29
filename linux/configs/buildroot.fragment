@@ -20,3 +20,6 @@ BR2_CCACHE=y
 BR2_CCACHE_DIR="$(HOME)/.buildroot-ccache"
 BR2_CCACHE_INITIAL_SETUP=""
 BR2_CCACHE_USE_BASEDIR=y
+
+# cnlohr's kernel patches for RV32 no-MMU, plus ours (linux/patches: uClibc riscv32 syscall fix).
+BR2_GLOBAL_PATCH_DIR="board/qemu/riscv32-virt/nommu/patches brick/patches"
