@@ -11,4 +11,4 @@ CONFIG_SIFIVE_PLIC=y
 CONFIG_EXT2_FS=y
 # busybox
 400
--rw-r--r-- 1 runner runner 4112324 Oct 29 05:56 /home/runner/work/Linux-in-roblox/Linux-in-roblox/linux/out/Image
+-rw-r--r-- 1 runner runner 4112324 Oct 29 06:50 /home/runner/work/Linux-in-roblox/Linux-in-roblox/linux/out/Image
