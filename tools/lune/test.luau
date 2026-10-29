@@ -9,7 +9,7 @@ local luau = require("@lune/luau")
 local process = require("@lune/process")
 local Shim = require("./RobloxShim")
 
-local root = Shim.mount("src/shared", "LinuxVM", { native = true })
+local root = Shim.mountMany({ LinuxVM = "src/shared", LinuxServer = "src/server", LinuxImages = "src/images" })
 local passed, failed = 0, 0
 
 local function test(name: string, fn: () -> ())

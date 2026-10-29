@@ -1,7 +1,7 @@
 return function(test, root, require)
-	local Lz4 = require(root.Util.Lz4)
-	local Base64 = require(root.Util.Base64)
-	local Tar = require(root.Util.Tar)
+	local Lz4 = require(root.LinuxVM.Util.Lz4)
+	local Base64 = require(root.LinuxVM.Util.Base64)
+	local Tar = require(root.LinuxVM.Util.Tar)
 
 	test("base64 round trips all lengths", function()
 		for len = 0, 40 do

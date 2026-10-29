@@ -1,5 +1,5 @@
 return function(test, root, require)
-	local Terminal = require(root.Terminal.Terminal)
+	local Terminal = require(root.LinuxVM.Terminal.Terminal)
 
 	local function fresh(cols, rows)
 		local t = Terminal.new(cols or 10, rows or 4)

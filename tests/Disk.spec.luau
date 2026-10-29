@@ -1,5 +1,5 @@
 return function(test, root, require)
-	local Disk = require(root.Emulator.Disk)
+	local Disk = require(root.LinuxVM.Emulator.Disk)
 
 	test("disk reads zeros, writes across block boundaries", function()
 		local d = Disk.new(64 * 1024)
