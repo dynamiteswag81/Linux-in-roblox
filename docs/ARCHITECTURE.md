@@ -49,7 +49,7 @@ switches to an installed system on `/dev/vda1` if there is one. Brick Linux's ow
 | --- | --- |
 | `ComputerService` | Players ↔ computers ↔ desks, remotes, the per-frame CPU budget, output streaming, autosave. |
 | `Computer` | One player's computer: VM + firmware + server-side Terminal. Streams raw console bytes, or a compact snapshot when output floods. |
-| `Firmware` | BrickBIOS POST screen, countdown, boot menu (installed system / live installer / fallback kernel). |
+| `Firmware` | BrickBIOS POST screen, countdown, boot menu: the installed system on the disk, then the installer flash drive; "No bootable device" otherwise. |
 | `DiskStore` | Disks in a DataStore: compressed, base64, chunked under 4 MB, two alternating slots so a failed save never corrupts the last good one. |
 | `WorkshopService` | Packages: publish (validation, ownership, quota, TextService filtering), search, details, download. `OfficialPackages` are built in. |
 | `HostLinkCommands` | What `hostlink` can ask for: `pkg.*` (workshop), `net.*` (who's online), `sys.*`. |

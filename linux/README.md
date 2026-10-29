@@ -11,7 +11,7 @@ a RISC-V **rv32ima, no-MMU** Linux 6.8 kernel with an embedded initramfs
 | `configs/*.fragment` | Our additions: disk (virtio-blk + ext2), networking (virtio-net + IPv4), a much fuller busybox |
 | `overlay/` | Files copied into the root filesystem: `/init`, rc scripts, `brick`, `brickstrap`, the install guide |
 | `src/hostlink.c` | The guest side of the host link (package manager / workshop channel) |
-| `patches/` | Source patches buildroot applies on top of cnlohr's (a uClibc riscv32 syscall fix) |
+| `patches/` | Source patches buildroot applies on top of cnlohr's: uClibc riscv32 64-bit syscall arguments, busybox hush `$(...)` crash, busybox httpd 404 on `/` |
 | `build.sh` | Builds everything with buildroot into `linux/out/Image` |
 
 ## Building
