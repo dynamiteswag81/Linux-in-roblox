@@ -1,9 +1,11 @@
 #!/bin/sh
 # Brick Linux initramfs entry point.
 #
-# The kernel always carries the live/installer system. If the host passes
-# brick.root=/dev/vdaN and that partition holds an installed system, switch to
-# it; otherwise boot the live environment (like booting the Arch ISO).
+# The kernel always carries the live/installer system. The firmware passes
+# brick.live=1 when it boots from the installer flash drive: then we start the
+# live environment (like booting the Arch ISO). Otherwise we were booted from
+# the disk: switch to the system installed on brick.root=/dev/vdaN, and if
+# there isn't one, say so and wait (the live system needs the flash drive).
 
 # The kernel starts us with no PATH.
 export PATH=/sbin:/bin:/usr/sbin:/usr/bin
@@ -23,9 +25,9 @@ for arg in $(cat /proc/cmdline); do
 	esac
 done
 
-if [ -z "$live" ] && [ -n "$root" ] && [ -b "$root" ]; then
+if [ -z "$live" ]; then
 	mkdir -p /newroot
-	if mount -t ext2 "$root" /newroot 2>/dev/null; then
+	if [ -n "$root" ] && [ -b "$root" ] && mount -t ext2 "$root" /newroot 2>/dev/null; then
 		if [ -e /newroot/sbin/init ] && [ ! -e /newroot/etc/brick/live ] && [ -x /sbin/switch_root ]; then
 			echo "Booting installed system from $root"
 			mkdir -p /newroot/dev /newroot/proc
@@ -33,9 +35,16 @@ if [ -z "$live" ] && [ -n "$root" ] && [ -b "$root" ]; then
 			umount /proc
 			exec /sbin/switch_root /newroot /sbin/init
 		fi
-		echo "$root has no installed system, starting the live environment"
 		umount /newroot
 	fi
+	echo
+	echo "ERROR: no installed system found on ${root:-the disk}."
+	echo
+	echo "To install Brick Linux, insert the installer flash drive and"
+	echo "restart the computer (it boots from the flash drive when the"
+	echo "disk has no system)."
+	# init must never exit; sleeping keeps the CPU idle.
+	while :; do sleep 3600; done
 fi
 
 umount /proc

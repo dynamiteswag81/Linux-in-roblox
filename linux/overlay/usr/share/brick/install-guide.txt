@@ -1,7 +1,7 @@
                      BRICK LINUX INSTALLATION GUIDE
                      ==============================
 
-You are running the live environment from the computer's firmware. It is
+You are running the live environment from the installer flash drive. It is
 fully usable, but nothing you do here is kept. Installing puts Brick Linux on
 this computer's disk, where your files are saved with your Roblox account.
 
@@ -59,7 +59,9 @@ this computer's disk, where your files are saved with your Roblox account.
        umount /mnt
        reboot
 
-   The firmware boots your installed system from the disk from now on.
+   You can take the flash drive out now. The firmware boots the system on
+   the disk from now on (to run the installer again, insert the flash
+   drive and pick it in the boot menu: F2 or Esc while the computer starts).
    Log in as root with the password you chose.
 
 AFTER INSTALLING

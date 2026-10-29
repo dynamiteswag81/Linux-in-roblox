@@ -1,0 +1,45 @@
+From: Brick Linux <brick@localhost>
+Subject: [PATCH] hush (NOMMU): fix crashes in $(...) started from a login shell
+
+On NOMMU, hush re-executes itself for subshells and $(...) and passes the
+parent's functions with "-F name body". Those functions point their name and
+body into argv (body == NULL marks them). unset_func() knows not to free
+them, but new_function() freed ->name unconditionally when a function was
+redefined.
+
+The re-executed child is started with the parent's argv0, so the child of a
+login shell ("-sh") was itself a login shell and sourced /etc/profile again.
+Any function defined there was redefined in every $(...) child, which freed a
+pointer into argv and corrupted the heap: every command substitution crashed.
+
+Fix both: don't free names of -F functions, and a re-executed child
+("-$" option) is never a login shell.
+
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -8292,11 +8292,12 @@ static struct function *new_function(char *name)
+ 		debug_printf_exec("func %p parent_cmd %p\n", funcp, cmd);
+ 		if (!cmd) {
+ 			debug_printf_exec("freeing & replacing function '%s'\n", funcp->name);
+-			free(funcp->name);
+-			/* Note: if !funcp->body, do not free body_as_string!
++			/* Note: if !funcp->body, do not free name or body_as_string!
+ 			 * This is a special case of "-F name body" function:
+-			 * body_as_string was not malloced! */
++			 * they point into argv and were not malloced
++			 * (see unset_func). */
+ 			if (funcp->body) {
++				free(funcp->name);
+ 				free_pipe_list(funcp->body);
+ # if !BB_MMU
+ 				free(funcp->body_as_string);
+@@ -10425,6 +10426,9 @@ int hush_main(int argc, char **argv)
+ 		case '$': {
+ 			unsigned long long empty_trap_mask;
+ 
++			/* A re-executed subshell keeps argv0 ("-sh"), but it
++			 * must not run /etc/profile again. */
++			flags &= ~OPT_login;
+ 			G.root_pid = bb_strtou(optarg, &optarg, 16);
+ 			optarg++;
+ 			G.root_ppid = bb_strtou(optarg, &optarg, 16);

@@ -8,6 +8,7 @@
 		pkg.get <name>         package archive (tar)
 		pkg.version <name>     latest version string
 		pkg.publish <name>     publish the tar archive sent as payload
+		pkg.unpublish <name>   remove one of your packages from the workshop
 		msg.send <user> <text> send a message to another player's computer (filtered)
 		msg.recv               take this computer's waiting messages
 		net.who                computers on the network: name, address, owner
@@ -248,6 +249,9 @@ function HostLinkCommands.run(
 		self.lastPublish[owner.userId] = now
 		local ok, message = self.workshop:publish(owner.userId, owner.name, arg, payload)
 		reply(ok, message .. "\n")
+	elseif command == "pkg.unpublish" then
+		local ok, message = self.workshop:unpublish(owner.userId, arg)
+		reply(ok, message .. "\n")
 	elseif command == "msg.send" then
 		reply(self:_send(owner, args))
 	elseif command == "msg.recv" then
@@ -263,7 +267,7 @@ function HostLinkCommands.run(
 	elseif command == "help" then
 		reply(
 			true,
-			"pkg.search pkg.info pkg.get pkg.version pkg.publish msg.send msg.recv net.who net.hosts sys.whoami sys.time\n"
+			"pkg.search pkg.info pkg.get pkg.version pkg.publish pkg.unpublish msg.send msg.recv net.who net.hosts sys.whoami sys.time\n"
 		)
 	else
 		reply(false, "hostlink: unknown command '" .. command .. "' (try: hostlink help)")

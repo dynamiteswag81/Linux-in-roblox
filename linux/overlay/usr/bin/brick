@@ -29,6 +29,7 @@ usage: brick <command> [args]
   upgrade             update all installed packages          (-Syu)
   new <name>          create a package skeleton to publish
   publish <dir>       publish a package directory to the Workshop
+  unpublish <pkg>     remove a package you published
 EOF
 }
 
@@ -184,6 +185,11 @@ do_publish() {
 	exit $status
 }
 
+do_unpublish() {
+	[ -n "$1" ] || die "unpublish: which package?"
+	hostlink pkg.unpublish "$1"
+}
+
 cmd="$1"
 [ $# -gt 0 ] && shift
 case "$cmd" in
@@ -196,6 +202,7 @@ case "$cmd" in
 	upgrade|-Syu|-Su) do_upgrade ;;
 	new) do_new "$@" ;;
 	publish) do_publish "$@" ;;
+	unpublish) do_unpublish "$@" ;;
 	""|help|-h|--help) usage ;;
 	*) usage; exit 1 ;;
 esac
