@@ -3,7 +3,7 @@
 	A complete virtual RISC-V computer: CPU + RAM + devices + boot logic.
 
 	Memory map (a superset of mini-rv32ima's, so its Linux images boot too):
-		0x10000000  UART0, 8250/16550 subset         -> console, /dev/ttyS0
+		0x10000000  UART0, 8250/16550 subset, irq 3  -> console, /dev/ttyS0
 		0x10001000  Host link mailbox                 -> `hostlink` tool (packages, workshop)
 		0x10002000  virtio-mmio block device, irq 1   -> /dev/vda
 		0x10003000  virtio-mmio network card, irq 2   -> eth0
@@ -34,6 +34,7 @@ local STEP_REBOOT = 0x7777
 
 local IRQ_BLK = 1
 local IRQ_NET = 2
+local IRQ_UART = 3
 
 export type MachineConfig = {
 	-- Bytes of guest RAM. 32 MB leaves room for a few programs on an installed system.
@@ -111,6 +112,9 @@ function Machine.new(config: MachineConfig?): Machine
 		cpu.meip = asserted
 	end)
 	self.plic = plic
+	self.console.onIrq = function(asserted)
+		plic:setLevel(IRQ_UART, asserted)
+	end
 
 	local blk: VirtioBlk.VirtioBlk? = nil
 	if cfg.disk then
@@ -268,6 +272,9 @@ function Machine.buildDeviceTree(self: Machine, usableRam: number): buffer
 	fdt:propU32("clock-frequency", 0x1000000)
 	fdt:propCells("reg", { 0, 0x10000000, 0, 0x100 })
 	fdt:propString("compatible", "ns16850")
+	-- An interrupt line means Linux doesn't have to poll the console.
+	fdt:propU32("interrupt-parent", plic)
+	fdt:propU32("interrupts", IRQ_UART)
 	fdt:endNode()
 
 	fdt:beginNode("interrupt-controller@10400000")

@@ -68,4 +68,5 @@ AFTER INSTALLING
    brick install <name>     install it
    brick new <name>         start your own package
    brick publish <dir>      share it with everyone
+   msg <user> <message>     message another player (msg alone reads yours)
    ifconfig / ping / nc     talk to other players' computers

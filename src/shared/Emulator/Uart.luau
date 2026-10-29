@@ -2,9 +2,12 @@
 --[[
 	8250/16550-compatible UART (the subset Linux's 8250 driver needs in polling mode).
 
-	There is no interrupt controller, so the guest polls the line status register.
 	Bytes the guest transmits are collected for the host; bytes the host queues are
-	handed to the guest one at a time through the receive buffer.
+	handed to the guest one at a time through the receive buffer. The interrupt
+	line (`onIrq`) follows 16550 rules: "data received" while there is input and
+	IER bit 0 is set, "transmitter empty" after each transmit (or when IER bit 1
+	is turned on) until the IIR reports it. Without an interrupt line wired up,
+	Linux simply polls the same registers.
 ]]
 
 local Uart = {}
@@ -27,8 +30,12 @@ export type Uart = typeof(setmetatable(
 		scr: number,
 		dll: number,
 		dlm: number,
+		threPending: boolean,
+		irq: boolean,
 		-- Called for every byte the guest transmits (optional).
 		onByte: ((byte: number) -> ())?,
+		-- Called when the interrupt line changes (optional).
+		onIrq: ((asserted: boolean) -> ())?,
 	},
 	Uart
 ))
@@ -45,8 +52,24 @@ function Uart.new(): Uart
 		scr = 0,
 		dll = 0,
 		dlm = 0,
+		threPending = false,
+		irq = false,
 		onByte = nil,
+		onIrq = nil,
 	}, Uart)
+end
+
+function Uart._updateIrq(self: Uart)
+	local rx = bit32.btest(self.ier, 0x01) and self._inputPos <= #self._input
+	local tx = bit32.btest(self.ier, 0x02) and self.threPending
+	local level = rx or tx
+	if level ~= self.irq then
+		self.irq = level
+		local onIrq = self.onIrq
+		if onIrq then
+			onIrq(level)
+		end
+	end
 end
 
 function Uart.reset(self: Uart)
@@ -58,6 +81,8 @@ function Uart.reset(self: Uart)
 	self.ier = 0
 	self.mcr = 0
 	self.scr = 0
+	self.threPending = false
+	self:_updateIrq()
 end
 
 function Uart.hasInput(self: Uart): boolean
@@ -71,6 +96,7 @@ function Uart.pushInput(self: Uart, data: string)
 		self._input = string.sub(self._input, self._inputPos) .. data
 	end
 	self._inputPos = 1
+	self:_updateIrq()
 end
 
 function Uart.popInput(self: Uart): number?
@@ -79,6 +105,9 @@ function Uart.popInput(self: Uart): number?
 		return nil
 	end
 	self._inputPos = pos + 1
+	if pos == #self._input then
+		self:_updateIrq()
+	end
 	return string.byte(self._input, pos)
 end
 
@@ -112,12 +141,17 @@ function Uart.read(self: Uart, offset: number): number
 	elseif offset == 1 then
 		return if dlab then self.dlm else self.ier
 	elseif offset == 2 then
-		-- IIR. Without an interrupt controller Linux polls this from a timer and
-		-- only services the port when an interrupt is reported "pending".
-		if self._inputPos <= #self._input then
+		-- IIR: highest-priority pending interrupt. Linux also polls this when the
+		-- port has no interrupt line, and only services it when something is pending.
+		if bit32.btest(self.ier, 0x01) and self._inputPos <= #self._input then
 			return 0xC4 -- received data available
-		elseif bit32.band(self.ier, 0x02) ~= 0 then
-			return 0xC2 -- transmit holding register empty
+		elseif bit32.btest(self.ier, 0x02) and self.threPending then
+			-- Reading IIR acknowledges the transmitter-empty interrupt.
+			self.threPending = false
+			self:_updateIrq()
+			return 0xC2
+		elseif self._inputPos <= #self._input then
+			return 0xC4 -- polled mode with interrupts masked: still report input
 		end
 		return 0xC1 -- nothing pending
 	elseif offset == 3 then
@@ -144,12 +178,20 @@ function Uart.write(self: Uart, offset: number, value: number)
 			self.dll = value
 		else
 			self:emit(value)
+			-- The byte leaves instantly, so the transmitter is empty again.
+			self.threPending = true
+			self:_updateIrq()
 		end
 	elseif offset == 1 then
 		if dlab then
 			self.dlm = value
 		else
-			self.ier = value
+			local enablingThre = not bit32.btest(self.ier, 0x02) and bit32.btest(value, 0x02)
+			self.ier = bit32.band(value, 0x0F)
+			if enablingThre then
+				self.threPending = true
+			end
+			self:_updateIrq()
 		end
 	elseif offset == 3 then
 		self.lcr = value

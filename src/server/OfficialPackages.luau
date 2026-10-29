@@ -280,6 +280,212 @@ fi
 ]==],
 		},
 	},
+	{
+		name = "lolcat",
+		version = "1.0",
+		description = "Rainbow-colors whatever you pipe into it. Try: brickfetch | lolcat",
+		files = {
+			["usr/bin/lolcat"] = [==[#!/bin/sh
+# lolcat - rainbow text (busybox awk)
+cat "$@" | awk 'BEGIN { split("31 33 32 36 34 35", c, " ") }
+{
+	out = ""
+	for (i = 1; i <= length($0); i++) {
+		out = out "\033[1;" c[int((i + NR * 2) / 3) % 6 + 1] "m" substr($0, i, 1)
+	}
+	print out "\033[0m"
+}'
+]==],
+		},
+	},
+	{
+		name = "banner",
+		version = "1.0",
+		description = "Prints words in big block letters. Usage: banner HELLO",
+		files = {
+			["usr/bin/banner"] = [==[#!/bin/sh
+# banner - big letters (5 rows per letter)
+[ $# -gt 0 ] || { echo "usage: banner <text>"; exit 1; }
+echo "$*" | awk '
+BEGIN {
+	f["A"]=" ### |#   #|#####|#   #|#   #"; f["B"]="#### |#   #|#### |#   #|#### "
+	f["C"]=" ####|#    |#    |#    | ####"; f["D"]="#### |#   #|#   #|#   #|#### "
+	f["E"]="#####|#    |#### |#    |#####"; f["F"]="#####|#    |#### |#    |#    "
+	f["G"]=" ####|#    |#  ##|#   #| ####"; f["H"]="#   #|#   #|#####|#   #|#   #"
+	f["I"]="#####|  #  |  #  |  #  |#####"; f["J"]="    #|    #|    #|#   #| ### "
+	f["K"]="#   #|#  # |###  |#  # |#   #"; f["L"]="#    |#    |#    |#    |#####"
+	f["M"]="#   #|## ##|# # #|#   #|#   #"; f["N"]="#   #|##  #|# # #|#  ##|#   #"
+	f["O"]=" ### |#   #|#   #|#   #| ### "; f["P"]="#### |#   #|#### |#    |#    "
+	f["Q"]=" ### |#   #|# # #|#  # | ## #"; f["R"]="#### |#   #|#### |#  # |#   #"
+	f["S"]=" ####|#    | ### |    #|#### "; f["T"]="#####|  #  |  #  |  #  |  #  "
+	f["U"]="#   #|#   #|#   #|#   #| ### "; f["V"]="#   #|#   #|#   #| # # |  #  "
+	f["W"]="#   #|#   #|# # #|## ##|#   #"; f["X"]="#   #| # # |  #  | # # |#   #"
+	f["Y"]="#   #| # # |  #  |  #  |  #  "; f["Z"]="#####|   # |  #  | #   |#####"
+	f["0"]=" ### |#  ##|# # #|##  #| ### "; f["1"]="  #  | ##  |  #  |  #  | ### "
+	f["2"]=" ### |#   #|  ## | #   |#####"; f["3"]="#### |    #| ### |    #|#### "
+	f["4"]="#   #|#   #|#####|    #|    #"; f["5"]="#####|#    |#### |    #|#### "
+	f["6"]=" ### |#    |#### |#   #| ### "; f["7"]="#####|    #|   # |  #  |  #  "
+	f["8"]=" ### |#   #| ### |#   #| ### "; f["9"]=" ### |#   #| ####|    #| ### "
+	f[" "]="     |     |     |     |     "; f["!"]="  #  |  #  |  #  |     |  #  "
+	f["?"]=" ### |#   #|  ## |     |  #  "; f["."]="     |     |     |     |  #  "
+	f["-"]="     |     |#####|     |     "
+}
+{
+	text = toupper($0)
+	for (row = 1; row <= 5; row++) {
+		line = ""
+		for (i = 1; i <= length(text); i++) {
+			ch = substr(text, i, 1)
+			if (!(ch in f)) ch = "?"
+			split(f[ch], rows, "|")
+			line = line rows[row] " "
+		}
+		print line
+	}
+}'
+]==],
+		},
+	},
+	{
+		name = "guess",
+		version = "1.0",
+		description = "Guess the number between 1 and 100. A tiny game to learn shell scripting from.",
+		files = {
+			["usr/bin/guess"] = [==[#!/bin/sh
+# guess - a number guessing game. Read this file to see how it works!
+secret=$(( RANDOM % 100 + 1 ))
+tries=0
+echo "I'm thinking of a number between 1 and 100."
+while true; do
+	printf 'Your guess: '
+	read -r n || exit 0
+	case "$n" in
+		''|*[!0-9]*) echo "Numbers only, please."; continue ;;
+	esac
+	tries=$((tries + 1))
+	if [ "$n" -lt "$secret" ]; then
+		echo "Higher!"
+	elif [ "$n" -gt "$secret" ]; then
+		echo "Lower!"
+	else
+		echo "Yes! It was $secret. You got it in $tries tries."
+		exit 0
+	fi
+done
+]==],
+		},
+	},
+	{
+		name = "todo",
+		version = "1.0",
+		description = "A tiny to-do list: todo add <thing>, todo list, todo done <number>.",
+		files = {
+			["usr/bin/todo"] = [==[#!/bin/sh
+# todo - a to-do list kept in ~/.todo
+file="$HOME/.todo"
+touch "$file"
+case "$1" in
+	add)
+		shift
+		[ -n "$*" ] || { echo "usage: todo add <thing to do>"; exit 1; }
+		echo "$*" >> "$file"
+		echo "Added: $*"
+		;;
+	done)
+		[ -n "$2" ] || { echo "usage: todo done <number>"; exit 1; }
+		item=$(sed -n "${2}p" "$file")
+		[ -n "$item" ] || { echo "No item $2"; exit 1; }
+		sed -i "${2}d" "$file"
+		echo "Done: $item"
+		;;
+	""|list)
+		if [ -s "$file" ]; then
+			nl -w2 -s'. ' "$file"
+		else
+			echo "Nothing to do! Add something with: todo add <thing>"
+		fi
+		;;
+	*)
+		echo "usage: todo [list] | todo add <thing> | todo done <number>"
+		;;
+esac
+]==],
+		},
+	},
+	{
+		name = "snake",
+		version = "1.0",
+		description = "The classic snake game, written in pure shell. Arrow keys or WASD, q to quit.",
+		readme = [[
+Eat the * to grow. Don't hit the walls or yourself.
+Controls: arrow keys or W/A/S/D. Q quits.
+The whole game is one shell script: cat /usr/bin/snake
+]],
+		files = {
+			["usr/bin/snake"] = [==[#!/bin/sh
+# snake - the classic game in busybox hush
+W=40; H=18
+saved=$(stty -g)
+cleanup() { stty "$saved"; printf '\033[0m\033[?25h\033[%d;1H\n' $((H + 4)); }
+trap 'cleanup; exit' INT TERM
+stty -icanon -echo min 0 time 1
+printf '\033[?25l\033[2J\033[H'
+# Walls
+row=1
+while [ $row -le $((H + 2)) ]; do
+	if [ $row -eq 1 ] || [ $row -eq $((H + 2)) ]; then
+		line="+"; i=0; while [ $i -lt $W ]; do line="$line-"; i=$((i + 1)); done
+		printf '\033[%d;1H%s+' $row "$line"
+	else
+		printf '\033[%d;1H|\033[%d;%dH|' $row $row $((W + 2))
+	fi
+	row=$((row + 1))
+done
+x=$((W / 2)); y=$((H / 2)); dx=1; dy=0
+body="$x,$y"; len=4; score=0
+place_food() {
+	while true; do
+		fx=$((RANDOM % W + 1)); fy=$((RANDOM % H + 1))
+		case " $body " in *" $fx,$fy "*) ;; *) break ;; esac
+	done
+	printf '\033[%d;%dH\033[1;33m*\033[0m' $((fy + 1)) $((fx + 1))
+}
+place_food
+while true; do
+	key=""
+	read -r -n 1 key
+	if [ "$key" = "$(printf '\033')" ]; then
+		read -r -n 1 key; read -r -n 1 key
+		case "$key" in A) key=w ;; B) key=s ;; C) key=d ;; D) key=a ;; esac
+	fi
+	case "$key" in
+		w|W) [ $dy -ne 1 ] && { dx=0; dy=-1; } ;;
+		s|S) [ $dy -ne -1 ] && { dx=0; dy=1; } ;;
+		a|A) [ $dx -ne 1 ] && { dx=-1; dy=0; } ;;
+		d|D) [ $dx -ne -1 ] && { dx=1; dy=0; } ;;
+		q|Q) break ;;
+	esac
+	x=$((x + dx)); y=$((y + dy))
+	if [ $x -lt 1 ] || [ $x -gt $W ] || [ $y -lt 1 ] || [ $y -gt $H ]; then break; fi
+	case " $body " in *" $x,$y "*) break ;; esac
+	body="$body $x,$y"
+	printf '\033[%d;%dH\033[1;32m@\033[0m' $((y + 1)) $((x + 1))
+	if [ $x -eq $fx ] && [ $y -eq $fy ]; then
+		len=$((len + 2)); score=$((score + 10)); place_food
+	fi
+	set -- $body
+	if [ $# -gt $len ]; then
+		tail=$1
+		printf '\033[%d;%dH ' $((${tail#*,} + 1)) $((${tail%,*} + 1))
+		body="${body#* }"
+	fi
+	printf '\033[%d;1HScore: %d   (q quits)' $((H + 3)) $score
+done
+cleanup
+echo "Game over! Score: $score"
+]==],
+		},
+	},
 }
 
 local OfficialPackages = {}

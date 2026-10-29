@@ -1,0 +1,21 @@
+# The official fun packages.
+alice: brick install banner lolcat todo guess snake
+@expect alice Installing snake
+alice: banner HI
+@expect alice #   # #####
+alice: echo hello | lolcat
+@expect alice hello
+alice: todo add feed the cat; todo add learn vi; todo done 1; todo list
+@expect alice 1. learn vi
+alice: !keys guess\r
+@wait 2
+alice: !keys 50\r
+@wait 2
+@expect alice Your guess:
+alice: !keys \x03
+alice: !keys snake\r
+@wait 4
+@peek alice snake-running
+alice: !keys q
+@wait 3
+@expect alice Game over!

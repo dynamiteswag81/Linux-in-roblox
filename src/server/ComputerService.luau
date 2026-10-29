@@ -119,7 +119,19 @@ local workshop = WorkshopService.new({
 	end,
 })
 local network = NetworkService.new()
-local commands = HostLinkCommands.new(workshop, network)
+local commands = HostLinkCommands.new(workshop, network, {
+	-- Player-to-player messages (`msg`) are filtered like private chat.
+	filterMessage = function(text: string, fromUserId: number, toUserId: number): string
+		local result = TextService:FilterStringAsync(text, fromUserId, Enum.TextFilterContext.PrivateChat)
+		return result:GetChatForUserAsync(toUserId)
+	end,
+	notifyMessage = function(toUserId: number, fromName: string, text: string)
+		local target = Players:GetPlayerByUserId(toUserId)
+		if target then
+			notify:FireClient(target, "📨 " .. fromName .. ": " .. text)
+		end
+	end,
+})
 
 ComputerService.workshop = workshop
 ComputerService.network = network
@@ -291,6 +303,7 @@ local function getComputer(session: Session): Computer.Computer?
 		ip = ipBytes,
 		mac = mac,
 		owner = player.Name,
+		userId = player.UserId,
 		deliver = function(frame)
 			computer:receiveFrame(frame)
 		end,
@@ -586,6 +599,7 @@ local function onPlayerRemoving(player: Player)
 	if session.endpoint then
 		network:detach(session.endpoint)
 	end
+	commands:forget(player.UserId)
 	saveDisk(session, "leaving")
 	sessions[player] = nil
 end

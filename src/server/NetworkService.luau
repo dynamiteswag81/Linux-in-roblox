@@ -20,6 +20,7 @@ export type Endpoint = {
 	ip: string, -- 4 raw bytes
 	mac: string, -- 6 raw bytes
 	owner: string,
+	userId: number?,
 	deliver: (frame: string) -> (),
 }
 
@@ -113,6 +114,21 @@ function NetworkService.lookup(self: NetworkService, name: string): string?
 	end
 	local endpoint = self.byName[name]
 	return if endpoint then endpoint.ip else nil
+end
+
+-- Finds the computer of a player by hostname or username (case-insensitive).
+function NetworkService.find(self: NetworkService, name: string): Endpoint?
+	local lower = string.lower(name)
+	local byName = self.byName[NetworkService.hostnameFor(name)]
+	if byName then
+		return byName
+	end
+	for _, e in self.byName do
+		if string.lower(e.owner) == lower then
+			return e
+		end
+	end
+	return nil
 end
 
 -- Lists computers on the network (for `hostlink net.who` and /etc/hosts).

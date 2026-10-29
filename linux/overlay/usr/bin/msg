@@ -1,0 +1,31 @@
+#!/bin/sh
+# msg - send a message to another player's computer, or read yours.
+#   msg <user> <message>    send (filtered like Roblox chat)
+#   msg                     show messages waiting for you
+#   msg -w                  keep watching for new messages (Ctrl+C to stop)
+case "$1" in
+	"")
+		out="$(hostlink msg.recv)" || exit 1
+		if [ -n "$out" ]; then
+			printf '%s\n' "$out"
+		else
+			echo "No new messages."
+		fi
+		;;
+	-w)
+		echo "Waiting for messages... (Ctrl+C to stop)"
+		while true; do
+			hostlink msg.recv
+			sleep 2
+		done
+		;;
+	-h|--help)
+		echo "usage: msg <user> <message> | msg | msg -w"
+		;;
+	*)
+		to="$1"
+		shift
+		[ $# -gt 0 ] || { echo "usage: msg <user> <message>"; exit 1; }
+		exec hostlink msg.send "$to" "$@"
+		;;
+esac

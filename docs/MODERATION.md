@@ -12,6 +12,11 @@ places. Here is what the game does today, and the choices that are yours to make
   and READMEs are stored filtered. If filtering is down, publishing is refused rather
   than storing unfiltered text.
 
+- **Messages between players** sent with `msg <user> <text>` inside the computer go
+  through the game server and are filtered per recipient like private chat
+  (`TextService:FilterStringAsync(..., PrivateChat):GetChatForUserAsync`). If filtering
+  fails, the message isn't delivered. This is the recommended way for players to talk.
+
 ## What isn't filtered (decisions for you)
 
 1. **Screens of other players' computers.** By default (`Config.SHOW_SCREENS_TO_OTHERS =
@@ -26,8 +31,8 @@ places. Here is what the game does today, and the choices that are yours to make
    packages to pass a review queue before they're listed.
 3. **The in-game network.** Computers exchange raw network traffic (`talk`, `nc`,
    web pages from `webserver`). That is player-to-player text that isn't filtered. Options:
-   leave it, filter the `talk` package's messages through a host-side chat bridge
-   instead of raw `nc`, or restrict network features to friends.
+   leave it, remove the raw `talk` package in favor of `msg` (filtered), or restrict
+   network features to friends.
 
 None of these are blocking for testing in Studio, but they're worth deciding before a
 public launch.

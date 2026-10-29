@@ -94,6 +94,7 @@ local function getComputer(name)
 		ip = ipBytes,
 		mac = mac,
 		owner = name,
+		userId = userId,
 		deliver = function(frame)
 			computer:receiveFrame(frame)
 		end,
@@ -236,6 +237,9 @@ for _, line in lines do
 				raw = string.gsub(raw, "\\r", "\r")
 				raw = string.gsub(raw, "\\n", "\n")
 				raw = string.gsub(raw, "\\e", "\27")
+				raw = string.gsub(raw, "\\x(%x%x)", function(hex)
+					return string.char(tonumber(hex, 16) :: number)
+				end)
 				c.computer:input(raw)
 				runAll(1.5)
 			else

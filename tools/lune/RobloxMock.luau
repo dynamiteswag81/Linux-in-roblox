@@ -392,6 +392,14 @@ function Mock.createWorld()
 	function players:GetPlayers()
 		return table.clone(self.list)
 	end
+	function players:GetPlayerByUserId(userId)
+		for _, p in self.list do
+			if p.UserId == userId then
+				return p
+			end
+		end
+		return nil
+	end
 	world.Players = players
 
 	local function runService(isServer)
@@ -470,10 +478,15 @@ function Mock.createWorld()
 	world.dataStores = stores
 
 	local textService = {}
-	function textService:FilterStringAsync(text)
+	function textService:FilterStringAsync(text, _fromUserId, context)
+		assert(typeof(context) == "EnumItem" or context == nil, "bad TextFilterContext")
 		local filtered = string.gsub(text, "badword", "#######")
 		return {
 			GetNonChatStringForBroadcastAsync = function()
+				return filtered
+			end,
+			GetChatForUserAsync = function(_, toUserId)
+				assert(type(toUserId) == "number", "GetChatForUserAsync needs a user id")
 				return filtered
 			end,
 		}

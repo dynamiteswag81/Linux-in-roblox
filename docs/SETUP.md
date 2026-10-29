@@ -84,3 +84,27 @@ DataStore names, workshop limits, network settings.
    the Community Workshop. `ping <username>`, `talk`, `browse`: the in-game network.
 6. **⏏ Leave** (or walking away) returns control to your character. Your computer keeps
    running while you're in the server, so things like web servers stay up.
+
+## First-run checklist (Studio)
+
+The game logic was developed and tested outside Roblox (see `tools/lune/sim.luau`,
+which runs the real server and client scripts against a validated mock of Roblox).
+On the first Play in Studio, check:
+
+1. **Output** shows no red errors from `LinuxServer` / `LinuxClient`. A yellow warning
+   about DataStores is expected unless API access is enabled.
+2. Walk to the desk: a **"Use computer"** prompt appears; press **E**.
+3. The camera moves to the screen and the on-screen keyboard bar appears at the bottom.
+4. Click **⏻ Power**: the BrickBIOS screen counts down, then Linux boots (about 5 s).
+5. Type `ls` and Enter. Try **Esc** from the bar, and **🔍 Zoom** for a big 2D view.
+6. Run `brick search` and `brick install cowsay`, then `cowsay hi`.
+7. Click **⏏ Leave**: your character can move again.
+
+If something fails, the Output window's first error is the most useful thing to send back.
+
+## Performance notes
+
+- One busy computer takes up to `Config.MAX_COMPUTER_BUDGET` (8 ms) of server time per
+  frame; all computers together take at most `Config.FRAME_BUDGET` (10 ms).
+- An idle computer costs ~1–2% of a core (less with the tickless kernel).
+- Each running computer holds `Config.RAM_MB` (32 MB) of server memory.

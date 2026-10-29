@@ -15,6 +15,19 @@ for prog in hostlink; do
 	rm -f "$TARGET/usr/bin/$prog.gdb"
 done
 
+# On no-MMU, FLAT binaries get a fixed stack and elf2flt's default is only 4 KB.
+# busybox hush overflows that when it re-executes itself for $(a | b), which
+# corrupts its own heap. Busybox asks for at least 20 KB; give it 64 KB.
+# (Setting BUSYBOX_FLAT_STACKSIZE breaks busybox's build quoting, so patch the
+# finished binary's header instead.)
+FLTHDR="$(ls "$HOST_DIR"/bin/*flthdr 2>/dev/null | head -n 1)"
+if [ -z "$FLTHDR" ]; then
+	echo "post-build: flthdr not found in $HOST_DIR/bin" >&2
+	exit 1
+fi
+"$FLTHDR" -s 65536 "$TARGET/bin/busybox"
+"$FLTHDR" -p "$TARGET/bin/busybox" | grep -i stack || true
+
 # busybox's buildroot package installs a telnetd service. An always-on telnetd
 # with a passwordless root would let anyone on the network take over the
 # computer, and it needs start-stop-daemon, which isn't built. Players can opt in.

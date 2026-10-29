@@ -195,7 +195,16 @@ local function send(bytes: string)
 	pendingInput ..= bytes
 end
 
-local function flushInput()
+local lastFlush = 0
+
+-- Sends queued keystrokes. Batched to at most 30 messages a second so fast
+-- frame rates (Heartbeat runs every frame) stay under the server's rate limit.
+local function flushInput(force: boolean?)
+	local now = os.clock()
+	if not force and now - lastFlush < 1 / 30 then
+		return
+	end
+	lastFlush = now
 	while #pendingInput > 0 do
 		local piece = string.sub(pendingInput, 1, Config.MAX_INPUT_BYTES)
 		pendingInput = string.sub(pendingInput, Config.MAX_INPUT_BYTES + 1)
@@ -350,7 +359,7 @@ local function exitFocus(tellServer: boolean)
 	end
 	focus = nil
 	held = nil
-	flushInput()
+	flushInput(true)
 	ContextActionService:UnbindAction(ACTION_NAME)
 	for _, c in f.connections do
 		c:Disconnect()

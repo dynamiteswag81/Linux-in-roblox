@@ -46,3 +46,9 @@ CONFIG_EPOLL=y
 CONFIG_SIGNALFD=y
 CONFIG_TIMERFD=y
 CONFIG_EVENTFD=y
+
+# Tickless idle: an idle computer stops taking 100 timer interrupts a second,
+# which was most of its cost on the server (~2K instructions per tick).
+CONFIG_HZ_PERIODIC=n
+CONFIG_NO_HZ_IDLE=y
+CONFIG_NO_HZ=y
