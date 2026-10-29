@@ -49,17 +49,37 @@ small fixes on first run (see the checklist in docs/SETUP.md).
    `/` (CGI without basic auth); `/init` no longer falls back to the live system
    when booted from disk (the installer needs the flash drive). Rerun all
    `tests/scenarios/*.txt` and measure idle cost with `lune run tools/lune/idle.luau`.
-2. **Studio smoke test** with the owner, and fixes from it.
-3. **Speed / scale:** run VMs in Actors for multi-core servers; an instruction decode
-   cache for 2× interpreted speed (for client-side VMs).
-4. **Snapshots:** save a booted machine's RAM so power-on can resume instantly,
+2. **Flash drive (server side).** The owner's game inserts the installer drive;
+   we provide the hook: a `FlashDrive` attribute on the desk plus
+   `ComputerService.insertFlashDrive(desk)` / `ejectFlashDrive(desk)`. Firmware boot
+   order: the disk if it holds a system (MBR + ext2 on partition 1), else the flash
+   drive (live installer, `brick.live=1`), else a "No bootable device, insert the
+   installer flash drive" screen that retries when a drive goes in.
+   `Config.REQUIRE_FLASH_DRIVE` (off for Studio testing without the mechanic).
+   Document it in docs/SETUP.md. (Guest side is done: `/init` no longer falls
+   back to the live system when booted from disk.)
+3. **Built from scratch:** remove the copied prebuilt `src/images/MiniLinux` image
+   and its fallback boot entry; README section on what is written for this
+   project (emulator, devices, terminal, firmware, OS integration, packages) vs.
+   upstream sources we compile (Linux, busybox, uClibc via buildroot).
+4. **Monitor for desktop environments:** `simple-framebuffer` in guest RAM
+   (kernel `CONFIG_FB_SIMPLE`), virtio-input for keyboard + mouse (`evdev`), a guest
+   drawing tool so shell scripts can draw, server-side dirty-tile streaming, client
+   rendering on the desk's monitor with EditableImage.
+5. **Docs:** player guide (installing, packages, network), package authoring guide,
+   flash-drive integration guide for the owner; confirm disk saving across visits
+   (DiskStore, autosave, save on leave/shutdown) and document it.
+6. **Studio smoke test** with the owner, and fixes from it.
+7. **Speed / scale:** run VMs in Actors for multi-core servers; an instruction decode
+   cache for 2x interpreted speed (for client-side VMs).
+8. **Snapshots:** save a booted machine's RAM so power-on can resume instantly,
    and suspend computers whose owner hasn't touched them for a while.
-5. **Installer polish:** password prompt on first boot of an installed system,
+9. **Installer polish:** password prompt on first boot of an installed system,
    `brickinstall` as a dialog, progress output in `brick`.
-6. **Workshop:** likes/ratings, "my packages" view, unpublish from the GUI, package
-   screenshots (text previews).
-7. **More software:** an `edit` text editor that's friendlier than vi, games
-   (2048, tetris), a `man`-style help system.
+10. **Workshop:** likes/ratings, "my packages" view, unpublish from the GUI, package
+    screenshots (text previews).
+11. **More software:** an `edit` text editor that's friendlier than vi, games
+    (2048, tetris), a `man`-style help system.
 
 ## Decisions waiting on the owner
 
