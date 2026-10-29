@@ -24,6 +24,32 @@ Living document: what works, what's next. Each work session updates it.
     applies.
   - The flash drive, desks and the Workshop are unaffected.
 
+## Monetization ideas (from the owner, not started)
+
+Possible paid features. Every one needs a game pass or developer product checked on
+the server (`MarketplaceService:UserOwnsGamePassAsync`, re-checked after
+`PromptGamePassPurchaseFinished`); the client never decides.
+
+- **Auto install.** The manual Arch-style install stays free. The pass skips it:
+  the firmware offers "Install Brick Linux automatically", which writes a ready-made
+  system to the disk directly. That's instant and needs no flash drive or typing.
+  `brickinstall` in the live system becomes the pass-only shortcut (today it's
+  free).
+- **More disk space.** Free disks are `Config.DISK_MB` (32 MB). Cleanest as a
+  second drive (`/dev/vdb`, "install a bigger hard drive") rather than growing
+  `/dev/vda`, because a grown disk still needs its partition and ext2 resized
+  inside Linux. Cost to watch: DataStore storage limits scale with the
+  experience's lifetime players, and disks only store used blocks (LZ4), so
+  paying players with full big disks are the main storage cost. Cap sizes, for
+  example 128 MB and 512 MB.
+- **Web hosting.** With one player per server, a website is down while its owner
+  is offline. Hosting publishes a copy of `/www` (size-capped, text filtered like
+  Workshop READMEs) that the network serves when the owner's computer isn't
+  online. Could include a custom name (`coolsite` alongside `alice`).
+
+Others that fit if wanted: a faster computer (more CPU budget or RAM), extra
+Workshop publishing slots, cosmetic desks and monitors.
+
 ## Status
 
 ### Done and tested headless (Lune)
@@ -107,6 +133,8 @@ small fixes on first run (see the checklist in docs/SETUP.md).
     (2048, tetris), a `man`-style help system.
 
 ## Decisions waiting on the owner
+
+- Which monetization ideas to build, and what stays free (see Monetization ideas).
 
 - Moderation choices in `docs/MODERATION.md` (screen sharing, package contents, raw
   network traffic like `talk`/`webserver`).
