@@ -1,0 +1,9 @@
+# The Community Workshop as a website on the in-game network.
+alice: wget -q -O - http://workshop/ | head -12
+@expect alice Community Workshop
+alice: wget -q -O - http://workshop/pkg/cowsay | head -5
+@expect alice A cow that says
+alice: wget -q -O /tmp/c.tar http://workshop/pkg/snake.tar && tar -tf /tmp/c.tar | grep bin/snake
+@expect alice files/usr/bin/snake
+alice: wget -q -O - "http://workshop/search?q=game" | grep -c snake
+@expect alice 1

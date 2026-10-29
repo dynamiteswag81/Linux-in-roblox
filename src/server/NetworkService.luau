@@ -12,6 +12,7 @@
 local LinuxVM = require(script.Parent.Deps) :: any
 local Config = require(LinuxVM.Config)
 local Packet = require(script.Parent.Net.Packet)
+local TcpServer = require(script.Parent.Net.TcpServer)
 
 local GATEWAY_MAC = "\2\0\10\0\0\1"
 
@@ -39,12 +40,14 @@ export type NetworkService = typeof(setmetatable(
 		windowStart: number,
 		now: () -> number,
 		dropped: number,
+		web: TcpServer.TcpServer?,
 	},
 	NetworkService
 ))
 
 function NetworkService.new(now: (() -> number)?): NetworkService
 	return setmetatable({
+		web = nil,
 		gatewayIp = Packet.ipFromString(Config.GATEWAY_IP) :: string,
 		byMac = {},
 		byIp = {},
@@ -56,6 +59,21 @@ function NetworkService.new(now: (() -> number)?): NetworkService
 		now = now or os.clock,
 		dropped = 0,
 	}, NetworkService)
+end
+
+-- Serves HTTP on the gateway's port 80 (e.g. the Community Workshop website).
+-- The handler gets the raw request and calls `respond` with the full HTTP
+-- response, now or later.
+function NetworkService.serveHttp(self: NetworkService, handler: TcpServer.Handler)
+	self.web = TcpServer.new(self.gatewayIp, 80, handler, self.now)
+end
+
+-- Housekeeping for the gateway's TCP connections (retransmits, timeouts).
+function NetworkService.tick(self: NetworkService)
+	local web = self.web
+	if web then
+		web:tick()
+	end
 end
 
 -- Picks the next free address: 10.0.0.2 ... 10.0.255.254. Returns (ipText, ipBytes, mac).
@@ -226,9 +244,17 @@ function NetworkService._gateway(self: NetworkService, from: Endpoint, frame: st
 			end
 		end
 	elseif ip.proto == Packet.PROTO_TCP then
-		local rst = Packet.tcpReset(ip.src, ip.dst, ip.payload)
-		if rst then
-			reply(Packet.PROTO_TCP, rst)
+		local web = self.web
+		local dstPort = if #ip.payload >= 4 then Packet.u16(ip.payload, 3) else 0
+		if web and dstPort == 80 then
+			web:receive(ip.src, ip.payload, function(segment)
+				reply(Packet.PROTO_TCP, segment)
+			end)
+		else
+			local rst = Packet.tcpReset(ip.src, ip.dst, ip.payload)
+			if rst then
+				reply(Packet.PROTO_TCP, rst)
+			end
 		end
 	end
 end

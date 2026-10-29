@@ -59,6 +59,10 @@ end
 local workshop = WorkshopService.new({ store = memoryStore(), official = OfficialPackages.build() })
 local network = NetworkService.new()
 local commands = HostLinkCommands.new(workshop, network)
+local WorkshopWeb = Shim.require(root.LinuxServer.WorkshopWeb)
+network:serveHttp(function(request, respond)
+	respond(WorkshopWeb.handle(workshop, request))
+end)
 
 local computers = {}
 local order = {}
@@ -121,6 +125,7 @@ local function runAll(seconds)
 			computer:update(now, 0.01)
 			computer:takeStream(now)
 		end
+		network:tick()
 	end
 end
 

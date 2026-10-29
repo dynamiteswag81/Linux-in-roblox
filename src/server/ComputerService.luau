@@ -30,6 +30,7 @@ local HostLinkCommands = require(script.Parent.HostLinkCommands)
 local NetworkService = require(script.Parent.NetworkService)
 local OfficialPackages = require(script.Parent.OfficialPackages)
 local WorkshopService = require(script.Parent.WorkshopService)
+local WorkshopWeb = require(script.Parent.WorkshopWeb)
 
 local DESK_TAG = "LinuxComputer"
 
@@ -132,6 +133,14 @@ local commands = HostLinkCommands.new(workshop, network, {
 		end
 	end,
 })
+
+-- The Community Workshop website at http://workshop/ on the in-game network.
+network:serveHttp(function(request, respond)
+	task.spawn(function()
+		local ok, result = pcall(WorkshopWeb.handle, workshop, request)
+		respond(if ok then result else "HTTP/1.0 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n")
+	end)
+end)
 
 ComputerService.workshop = workshop
 ComputerService.network = network
@@ -554,6 +563,7 @@ local function step()
 			end
 		end
 	end
+	network:tick()
 	-- Stream output (including computers that just turned off).
 	for _, session in sessions do
 		local computer = session.computer
