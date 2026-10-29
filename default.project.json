@@ -1,0 +1,23 @@
+{
+  "name": "linux-in-roblox",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "LinuxVM": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "LinuxServer": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "LinuxClient": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}

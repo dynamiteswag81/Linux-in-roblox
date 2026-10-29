@@ -1,0 +1,10 @@
+# Roblox place files and Rojo outputs
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxlx.lock
+sourcemap.json
+
+# Local build outputs
+/build/
+/out/
