@@ -30,11 +30,12 @@ Possible paid features. Every one needs a game pass or developer product checked
 the server (`MarketplaceService:UserOwnsGamePassAsync`, re-checked after
 `PromptGamePassPurchaseFinished`); the client never decides.
 
-- **Auto install.** The manual Arch-style install stays free. The pass skips it:
-  the firmware offers "Install Brick Linux automatically", which writes a ready-made
-  system to the disk directly. That's instant and needs no flash drive or typing.
-  `brickinstall` in the live system becomes the pass-only shortcut (today it's
-  free).
+- **Auto install.** The manual Arch-style install stays free. The pass skips it
+  with a button in an in-game GUI, outside the computer. Nothing is added to the
+  computer's screen or firmware. The button asks the server, which checks the pass
+  and writes a ready-made system straight to the player's disk (a server API such as
+  `ComputerService.autoInstall(player)`). That's instant and needs no flash drive
+  or typing. Open question: whether `brickinstall` in the live system stays free.
 - **More disk space.** Free disks are `Config.DISK_MB` (32 MB). Cleanest as a
   second drive (`/dev/vdb`, "install a bigger hard drive") rather than growing
   `/dev/vda`, because a grown disk still needs its partition and ext2 resized
