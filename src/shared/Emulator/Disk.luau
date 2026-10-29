@@ -7,8 +7,23 @@
 	changes (see DiskStore on the server).
 ]]
 
+local Lz4 = require(script.Parent.Parent.Util.Lz4)
+
 local Disk = {}
 Disk.__index = Disk
+
+local MAGIC = "BDSK"
+local FORMAT_VERSION = 1
+
+local function isZero(b: buffer, offset: number, len: number): boolean
+	local readu32 = buffer.readu32
+	for i = offset, offset + len - 4, 4 do
+		if readu32(b, i) ~= 0 then
+			return false
+		end
+	end
+	return true
+end
 
 export type Disk = typeof(setmetatable(
 	{} :: {
@@ -61,12 +76,20 @@ function Disk.writeFrom(self: Disk, offset: number, len: number, src: buffer, sr
 		local within = offset % bs
 		local n = math.min(len, bs - within)
 		local block = self.blocks[index]
-		if not block then
-			block = buffer.create(bs)
-			self.blocks[index] = block
+		if n == bs and isZero(src, srcOffset, n) then
+			-- A whole block of zeros (mkfs does lots of these): store nothing.
+			if block then
+				self.blocks[index] = nil
+				self.dirty[index] = true
+			end
+		else
+			if not block then
+				block = buffer.create(bs)
+				self.blocks[index] = block
+			end
+			buffer.copy(block, within, src, srcOffset, n)
+			self.dirty[index] = true
 		end
-		buffer.copy(block, within, src, srcOffset, n)
-		self.dirty[index] = true
 		offset += n
 		srcOffset += n
 		len -= n
@@ -81,6 +104,58 @@ function Disk.usedBlocks(self: Disk): number
 		n += 1
 	end
 	return n
+end
+
+--[[
+	Serializes the disk contents into one compressed buffer:
+		"BDSK", version u8, blockSize u32, size u32, count u32,
+		count x block index u32, count x block data
+	then LZ4-compressed, prefixed by the uncompressed length (u32).
+]]
+function Disk.serialize(self: Disk): buffer
+	local indices = {}
+	for index in self.blocks do
+		table.insert(indices, index)
+	end
+	table.sort(indices)
+	local count = #indices
+	local bs = self.blockSize
+	local headerSize = 17 + 4 * count
+	local raw = buffer.create(headerSize + count * bs)
+	buffer.writestring(raw, 0, MAGIC)
+	buffer.writeu8(raw, 4, FORMAT_VERSION)
+	buffer.writeu32(raw, 5, bs)
+	buffer.writeu32(raw, 9, self.size)
+	buffer.writeu32(raw, 13, count)
+	for i, index in indices do
+		buffer.writeu32(raw, 17 + 4 * (i - 1), index)
+		buffer.copy(raw, headerSize + (i - 1) * bs, self.blocks[index], 0, bs)
+	end
+	local packed = Lz4.compress(raw)
+	local out = buffer.create(4 + buffer.len(packed))
+	buffer.writeu32(out, 0, buffer.len(raw))
+	buffer.copy(out, 4, packed, 0, buffer.len(packed))
+	return out
+end
+
+function Disk.deserialize(data: buffer): Disk
+	local rawSize = buffer.readu32(data, 0)
+	local packed = buffer.create(buffer.len(data) - 4)
+	buffer.copy(packed, 0, data, 4, buffer.len(packed))
+	local raw = Lz4.decompress(packed, rawSize)
+	assert(buffer.readstring(raw, 0, 4) == MAGIC, "not a disk image")
+	assert(buffer.readu8(raw, 4) == FORMAT_VERSION, "unsupported disk image version")
+	local bs = buffer.readu32(raw, 5)
+	local disk = Disk.new(buffer.readu32(raw, 9), bs)
+	local count = buffer.readu32(raw, 13)
+	local headerSize = 17 + 4 * count
+	for i = 1, count do
+		local index = buffer.readu32(raw, 17 + 4 * (i - 1))
+		local block = buffer.create(bs)
+		buffer.copy(block, 0, raw, headerSize + (i - 1) * bs, bs)
+		disk.blocks[index] = block
+	end
+	return disk
 end
 
 -- Returns and clears the set of dirty block indices.

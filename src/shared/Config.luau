@@ -1,0 +1,87 @@
+--!strict
+--[[
+	Game-wide settings. Everything tweakable lives here.
+]]
+
+local Config = {
+	-- Name shown in the firmware, boot screens and docs.
+	OS_NAME = "Brick Linux",
+
+	---------------------------------------------------------------------------
+	-- Computers
+	---------------------------------------------------------------------------
+
+	-- Guest RAM per computer. Each running computer holds this much in server memory.
+	RAM_MB = 32,
+	-- Disk size per player. Only written blocks use memory/DataStore space.
+	DISK_MB = 32,
+	-- Terminal size (the guest is told this through the kernel command line).
+	COLS = 80,
+	ROWS = 25,
+
+	-- Server CPU time (seconds) all running computers may use per frame, and the
+	-- most a single computer may take. Idle computers cost almost nothing.
+	FRAME_BUDGET = 0.010,
+	MAX_COMPUTER_BUDGET = 0.008,
+	-- Guest microseconds that pass per executed instruction while busy (see Machine).
+	US_PER_INSTRUCTION = 0.25,
+
+	-- Seconds the firmware waits before booting the default entry.
+	BOOT_COUNTDOWN = 3,
+
+	-- Kernel images in ServerStorage.LinuxImages, in order of preference.
+	-- BrickLinux is built by CI from linux/; MiniLinux is the prebuilt fallback.
+	IMAGES = { "BrickLinux", "MiniLinux" },
+
+	---------------------------------------------------------------------------
+	-- Screens and moderation
+	---------------------------------------------------------------------------
+
+	-- When false, only the person using a computer sees its screen; others see
+	-- "in use". Terminal text is player-generated and unfiltered, so Roblox's
+	-- text filtering rules apply before turning this on (see docs/MODERATION.md).
+	SHOW_SCREENS_TO_OTHERS = false,
+
+	-- Raw output per computer per frame before the server switches to sending
+	-- compact screen snapshots (protects bandwidth when something floods output).
+	MAX_STREAM_BYTES_PER_FRAME = 4096,
+	SNAPSHOT_INTERVAL = 0.1,
+
+	-- Input from clients: max bytes per message and messages per second.
+	MAX_INPUT_BYTES = 512,
+	MAX_INPUT_RATE = 60,
+
+	---------------------------------------------------------------------------
+	-- Saving
+	---------------------------------------------------------------------------
+
+	DISK_DATASTORE = "BrickDisks_v1",
+	-- Autosave changed disks this often (seconds), and at most this often on `sync`.
+	AUTOSAVE_INTERVAL = 120,
+	MIN_SAVE_INTERVAL = 20,
+
+	---------------------------------------------------------------------------
+	-- Community Workshop
+	---------------------------------------------------------------------------
+
+	WORKSHOP_DATASTORE = "BrickWorkshop_v1",
+	-- Largest package (uncompressed tar) a player may publish.
+	MAX_PACKAGE_BYTES = 1024 * 1024,
+	-- Run package names/descriptions/readmes through TextService before others see them.
+	FILTER_WORKSHOP_TEXT = true,
+	-- How many packages one player may publish.
+	MAX_PACKAGES_PER_PLAYER = 50,
+
+	---------------------------------------------------------------------------
+	-- In-game network
+	---------------------------------------------------------------------------
+
+	-- Computers get 10.0.x.y addresses; the game itself answers at 10.0.0.1
+	-- (ping, DNS for player computer names).
+	GATEWAY_IP = "10.0.0.1",
+	DNS_SUFFIX = "brick",
+	-- Frames per second one computer may send before the switch drops them.
+	MAX_FRAMES_PER_SECOND = 400,
+}
+
+return Config

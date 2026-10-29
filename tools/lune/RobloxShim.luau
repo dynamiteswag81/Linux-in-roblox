@@ -171,4 +171,23 @@ function Shim.mount(dir: string, name: string, options: { native: boolean }?): a
 	return root
 end
 
+-- Mounts several directories as siblings under one root folder, like the
+-- game's tree (e.g. { LinuxVM = "src/shared", LinuxServer = "src/server" }).
+function Shim.mountMany(dirs: { [string]: string }, options: { native: boolean }?): any
+	local opts = options or { native = true }
+	local root = setmetatable({
+		Name = "game",
+		Parent = nil,
+		ClassName = "Folder",
+		_children = {},
+		_options = opts,
+	}, nodeMeta)
+	for name, dir in dirs do
+		local child = Shim.mount(dir, name, opts)
+		rawset(child, "Parent", root)
+		rawget(root, "_children")[name] = child
+	end
+	return root
+end
+
 return Shim
